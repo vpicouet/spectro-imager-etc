@@ -1,0 +1,17 @@
+plotly
+numpy
+scipy 
+matplotlib
+astropy
+datetime
+astroquery
+pandas
+ipywidgets
+ipympl
+voila 
+#bqplot
+#ipympl
+#ipyvolume
+django
+gunicorn
+django-heroku
