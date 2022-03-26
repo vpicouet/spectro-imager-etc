@@ -10,6 +10,7 @@ matplotlib
 #ipympl
 voila==0.3.4
 jinja2==2.11.3
+markupsafe==2.0.1
 voila-material
 #bqplot
 #ipympl
