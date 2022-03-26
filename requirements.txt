@@ -8,7 +8,7 @@ matplotlib
 #pandas
 #ipywidgets
 #ipympl
-voila 
+voila=0.3.4
 voila-material
 #bqplot
 #ipympl
