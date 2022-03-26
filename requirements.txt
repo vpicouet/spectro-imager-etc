@@ -9,7 +9,7 @@ matplotlib
 #ipywidgets
 #ipympl
 voila==0.3.4
-jinja2
+jinja2==2.11.3
 voila-material
 #bqplot
 #ipympl
