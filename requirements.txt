@@ -1,6 +1,6 @@
 #plotly
 numpy
-#scipy 
+scipy 
 matplotlib
 #astropy
 #datetime
@@ -14,7 +14,7 @@ markupsafe==2.0.1
 voila-material
 ipython
 #bqplot
-#ipympl
+ipympl
 #ipyvolume
 #django
 #gunicorn
