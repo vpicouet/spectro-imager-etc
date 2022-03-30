@@ -2,7 +2,7 @@
 numpy
 scipy 
 matplotlib
-#astropy
+astropy
 #datetime
 #astroquery
 #pandas
