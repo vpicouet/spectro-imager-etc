@@ -2,7 +2,7 @@ numpy
 scipy 
 matplotlib
 astropy
-google_drive_downloader
+#google_drive_downloader
 gdown==4.3.0
 ipywidgets
 ipympl
