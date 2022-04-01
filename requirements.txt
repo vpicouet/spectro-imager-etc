@@ -20,5 +20,5 @@ ipympl
 #plotly
 #datetime
 #astroquery
-#pandas
+pandas
 #bqplot
