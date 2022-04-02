@@ -12,12 +12,12 @@ markupsafe==2.0.1
 voila-material
 ipython
 ipympl
+plotly
 
 #ipyvolume
 #django
 #gunicorn
 #django-heroku
-#plotly
 #datetime
 #astroquery
 pandas
