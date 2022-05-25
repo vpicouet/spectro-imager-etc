@@ -1,0 +1,133 @@
+self =  Observation(EM_gain=1700,RN=65, smearing=0.6,Dard_current=1,counting_mode=True)
+%lprun -f Observation.compute_optimal_threshold self.compute_optimal_threshold(plot_=False)
+
+
+Timer unit: 1e-06 s
+
+Total time: 0.410382 s
+File: /Users/Vincent/Github/fireball2-etc/notebooks/same.py
+Function: compute_optimal_threshold at line 241
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   241                                               def compute_optimal_threshold(self,flux = 0.1,dark_cic_sky_noise=None,plot_=False,title='',i=0):
+   242                                                   #self.Signal_el if np.isscalar(self.Signal_el) else 0.3
+   243         1          9.0      9.0      0.0          Emgain = self.EM_gain if np.isscalar(self.EM_gain) else self.EM_gain[i]#1000
+   244         1          5.0      5.0      0.0          RN = self.RN if np.isscalar(self.RN) else self.RN[i]#80
+   245         1          4.0      4.0      0.0          CIC_noise = self.CIC_noise if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
+   246         1          3.0      3.0      0.0          dark_noise = self.Dark_current_noise if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
+   247                                                    
+   248         1          3.0      3.0      0.0          try:
+   249         1          4.0      4.0      0.0              Sky_noise = self.Sky_noise_pre_thresholding if np.isscalar(self.Sky_noise_pre_thresholding) else self.Sky_noise_pre_thresholding[i]
+   250                                                   except AttributeError:
+   251                                                       raise AttributeError('You must use counting_mode=True to use compute_optimal_threshold method.')
+   252                                           
+   253         1          4.0      4.0      0.0          size= (int(1e3),int(1e3))
+   254         1      23466.0  23466.0      5.7          im = np.random.poisson(flux, size=size)
+   255         1      16562.0  16562.0      4.0          values,bins = np.histogram(im,bins=[-0.5,0.5,1.5,2.5])
+   256         1          4.0      4.0      0.0          ConversionGain=1#/4.5
+   257         1      19320.0  19320.0      4.7          imaADU = np.random.gamma(im, Emgain) *ConversionGain
+   258         1       1119.0   1119.0      0.3          bins = np.arange(np.min(imaADU)-5*RN*ConversionGain,np.max(imaADU)+5*RN*ConversionGain,25)
+   259                                                   # bins = np.linspace(-500,10000,400)
+   260                                                   #imaADU = (np.random.gamma(im, Emgain) + np.random.normal(0, RN, size=size))*ConversionGain
+   261         1          3.0      3.0      0.0          if plot_:
+   262                                                       fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,figsize=(9,5))
+   263                                                       val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k',label='Before ampl & smearing')
+   264                                                       val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+   265                                                       val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+   266                                           
+   267                                           
+   268         1          5.0      5.0      0.0          if self.smearing > 0:
+   269                                                       # print(SmearExpDecrement)
+   270         2      81044.0  40522.0     19.7              smearing_kernels = variable_smearing_kernels(
+   271         1          3.0      3.0      0.0                  imaADU, self.smearing, SmearExpDecrement=5e4)
+   272         1         17.0     17.0      0.0              offsets = np.arange(6)
+   273         2        169.0     84.5      0.0              A = dia_matrix(
+   274         1          9.0      9.0      0.0                  (smearing_kernels.reshape((6, -1)), offsets),
+   275         1          4.0      4.0      0.0                  shape=(imaADU.size, imaADU.size))
+   276                                           
+   277         1      13588.0  13588.0      3.3              imaADU = A.dot(imaADU.ravel()).reshape(imaADU.shape)
+   278         1      31579.0  31579.0      7.7          imaADU += np.random.normal(0, RN, size=size)*ConversionGain
+   279         1          4.0      4.0      0.0          if plot_:
+   280                                                       val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,label='0',log=True)
+   281                                                       val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,label='1',log=True)
+   282                                                       val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,label='2',log=True)
+   283                                                       ax1.hist(imaADU.flatten(),bins=bins,label='Total histogram',log=True,histtype='step',lw=1,color='k')
+   284                                                   else:
+   285         1      85717.0  85717.0     20.9              val0,_ = np.histogram(imaADU[im==0],bins=bins)#,alpha=0.5,label='0',log=True)
+   286         1      12200.0  12200.0      3.0              val1,_ = np.histogram(imaADU[im==1],bins=bins)#,alpha=0.5,label='1',log=True)
+   287         1       2585.0   2585.0      0.6              val2,_ = np.histogram(imaADU[im==2],bins=bins)#,alpha=0.5,label='2',log=True)
+   288                                           
+   289         1         16.0     16.0      0.0          b = (bins[:-1]+bins[1:])/2
+   290                                                   rn_noise = (RN/(Emgain * ConversionGain)) * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
+   291         1      13689.0  13689.0      3.3          # rn_noise = RN* np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
+   292         1      25702.0  25702.0      6.3          signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
+   293         1      12861.0  12861.0      3.1          signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+   294         1         20.0     20.0      0.0          pc = np.ones(len(b))# 
+   295                                                   pc = ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+   296                                                  # pc =  ([np.sum(val0[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+   297         1      36457.0  36457.0      8.9  
+   298         1      33927.0  33927.0      8.3          if dark_cic_sky_noise is None:
+   299         1          4.0      4.0      0.0              noise = CIC_noise**2+dark_noise**2+Sky_noise**2
+   300         1          6.0      6.0      0.0          else:
+   301                                                       noise = dark_cic_sky_noise
+   302                                                   # print('noises = ',noise)
+   303                                                   plt.semilogy(b,signal1)
+   304                                                   
+   305                                                   # plt.semilogy(b,signal1)
+   306                                                   # plt.semilogy(b,rn_noise)
+   307                                                   # plt.semilogy(b,signal1/np.sqrt(signal1+noise+(1*rn_noise**2)))
+   308                                                   # plt.semilogy(b,signal1/np.sqrt((signal1+noise+rn_noise**2)))
+   309                                                   # plt.semilogy(b,signal1/(signal1+0.1*noise+rn_noise**2))
+   310                                                   # plt.plot(b,signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2))
+   311                                                   SNR1 = pc*signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)
+   312         1         23.0     23.0      0.0          SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
+   313         1         15.0     15.0      0.0          SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(Emgain * ConversionGain))**2)
+   314         1          8.0      8.0      0.0          # print('SNR_analogic = ',SNR_analogic)
+   315                                                   
+   316                                                   threshold = b[np.nanargmax(SNR1)]
+   317         1         79.0     79.0      0.0          fraction_signal = np.sum(val1[np.nanargmax(SNR1):])/np.sum(val1)
+   318         1         52.0     52.0      0.0          fraction_rn = np.sum(val0[np.nanargmax(SNR1):])/np.sum(val0)
+   319         1         27.0     27.0      0.0          lw=3
+   320         1         22.0     22.0      0.0          if plot_:
+   321         1          4.0      4.0      0.0              ax2.plot(b,signal1/flux,label='Signal(Signal>T)',lw=lw)
+   322         1          3.0      3.0      0.0              ax2.plot(b,np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0),label='RN(RN>T)',lw=lw)
+   323         1          3.0      3.0      0.0              # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EMGAIN)**2',lw=lw)
+   324                                                       ax2.plot(b,pc,label='Fraction(T) of true positive',lw=lw)
+   325                                                       #ax2.plot(b,SNR1/pc,label='SNR without fraction')
+   326                                           
+   327                                           
+   328                                           
+   329                                                       ax2.plot(b,SNR1,label='SNR1, frac(N0)=%i%%, frac(N1)=%i%%'%(100*np.sum(val0[np.nanargmax(SNR1):])/np.sum(val0),100*np.sum(val1[np.nanargmax(SNR1):])/np.sum(val1)),lw=lw)
+   330                                                       # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
+   331                                                       # ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic',lw=lw)
+   332                                                       # ax2.plot(b,SNR12/SNR_analogic,':',label='SNR12 PC / SNR analogic',lw=lw)
+   333                                                       # ax2.set_yscale('log')
+   334                                                       ax2.set_ylim(ymin=1e-5)
+   335                                                       
+   336                                                       # ax2.plot(b,SNR1,label='[N1]/[N0] = %0.2f, frac(N1)=%i%%'%(val1[np.nanargmax(SNR1)]/val0[np.nanargmax(SNR1)],100*np.sum(val1[np.nanargmax(SNR1):])/np.sum(val1)))
+   337                                                       # ax2.plot(b,SNR12,label='[N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))))
+   338                                           
+   339                                                       L = ax1.legend(fontsize=7)
+   340                                                       ax2.legend(fontsize=7)
+   341                                                       ax2.set_xlabel('ADU')
+   342                                                       ax1.set_ylabel('#')
+   343                                                       ax2.set_ylabel('SNR')
+   344                                                       threshold = b[np.nanargmax(SNR1)]
+   345                                                       L.get_texts()[1].set_text('0 e- : %i%%, faction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[np.nanargmax(SNR1):])/np.sum(val0)))
+   346                                                       L.get_texts()[2].set_text('1 e- : %i%%, faction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[np.nanargmax(SNR1):])/np.sum(val1)))
+   347                                                       L.get_texts()[3].set_text('2 e- : %i%%, faction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[np.nanargmax(SNR1):])/np.sum(val2)))
+   348                                                       ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k')
+   349                                                       ax2.plot([threshold,threshold],[0,np.nanmax(SNR1)],':',c='k')
+   350                                                       ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, Smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(Emgain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
+   351                                                       ax1.set_xlim(xmin=bins.min(),xmax=7000)#bins.max())
+   352                                                       fig.tight_layout()
+   353                                           
+   354                                                   #print(i)
+   355                                                   #print('flux, threshold,fractions = ',flux,threshold, fraction_signal, fraction_rn)
+   356                                                   #print('RN, Sky_noise, Emgain, CIC_noise: ', RN, Sky_noise, Emgain, CIC_noise)
+   357                                                   print("INTERP: Emgain = %0.2f, RN = %0.2f, flux = %0.2f, smearing = %0.2f"%(Emgain,RN,flux, self.smearing))
+   358                                           
+   359                                                   print("MEASURE: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)))
+   360                                           
+   361                                                   return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)
