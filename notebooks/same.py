@@ -7,7 +7,7 @@ Created on Tue May 24 17:35:03 2022
 """
 
 from ipywidgets import Button, Layout, jslink, IntText, IntSlider, interactive, interact, HBox, Layout, VBox
-%matplotlib widget
+# %matplotlib widget
 from IPython.display import display, clear_output
 
 import ipywidgets as widgets
@@ -100,9 +100,9 @@ class Observation:
             #self.Signal_el = self.Signal_LU*self.factor_el*exposure_time 
 
             #             self.Photon_count_loss = 0.7 if readout_time==1.5 else 0.8 #a contraindre...
-            # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
+            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding, self.true_positive, self.fake_negative = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
         # if counting_mode:
-            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
+            # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
             # print(self.Photon_fraction_kept.min(), self.Photon_fraction_kept.max())
             # print(self.RN_fraction_kept.min(), self.RN_fraction_kept.max())
             # print(self.gain_thresholding.min(), self.gain_thresholding.max())
@@ -288,19 +288,20 @@ class Observation:
 
         b = (bins[:-1]+bins[1:])/2
         rn_noise = (RN/(Emgain * ConversionGain)) * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
-        # rn_noise = RN* np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
+        # rn_noise = (RN/1)* np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
         signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
         signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
         pc = np.ones(len(b))# 
         pc = ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-       # pc =  ([np.sum(val0[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-
+        # pc = ([np.sum(val0[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+        true_positives =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+        fake_negatives =  ([np.sum(val1[b<bi])for bi in b]/(np.array([np.sum(val1[b<bi])for bi in b])+np.array([np.sum(val0[b<bi]) for bi in b])))
         if dark_cic_sky_noise is None:
             noise = CIC_noise**2+dark_noise**2+Sky_noise**2
         else:
             noise = dark_cic_sky_noise
         # print('noises = ',noise)
-        plt.semilogy(b,signal1)
+        # plt.semilogy(b,signal1)
         
         # plt.semilogy(b,signal1)
         # plt.semilogy(b,rn_noise)
@@ -308,14 +309,16 @@ class Observation:
         # plt.semilogy(b,signal1/np.sqrt((signal1+noise+rn_noise**2)))
         # plt.semilogy(b,signal1/(signal1+0.1*noise+rn_noise**2))
         # plt.plot(b,signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2))
-        SNR1 = pc*signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)
+        SNR1 = pc*signal1/np.sqrt(1.41*signal1+noise+np.array(rn_noise)**2)
         SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
         SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(Emgain * ConversionGain))**2)
         # print('SNR_analogic = ',SNR_analogic)
         
         threshold = b[np.nanargmax(SNR1)]
-        fraction_signal = np.sum(val1[np.nanargmax(SNR1):])/np.sum(val1)
-        fraction_rn = np.sum(val0[np.nanargmax(SNR1):])/np.sum(val0)
+        index = np.nanargmax(SNR1)
+        fraction_signal = np.sum(val1[index:])/np.sum(val1)
+        fraction_rn = np.sum(val0[index:])/np.sum(val0)
+        true_positive, fake_negative = true_positives[index], fake_negatives[index]
         lw=3
         if plot_:
             ax2.plot(b,signal1/flux,label='Signal(Signal>T)',lw=lw)
@@ -353,12 +356,12 @@ class Observation:
 
         #print(i)
         #print('flux, threshold,fractions = ',flux,threshold, fraction_signal, fraction_rn)
-        #print('RN, Sky_noise, Emgain, CIC_noise: ', RN, Sky_noise, Emgain, CIC_noise)
-        print("INTERP: Emgain = %0.2f, RN = %0.2f, flux = %0.2f, smearing = %0.2f"%(Emgain,RN,flux, self.smearing))
+        print('RN, Sky_noise, Emgain, CIC_noise: ', RN, Sky_noise, Emgain, CIC_noise)
+        # print("INTERP: Emgain = %0.2f, RN = %0.2f, flux = %0.2f, smearing = %0.2f"%(Emgain,RN,flux, self.smearing))
 
-        print("MEASURE: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)))
+        # print("MEASURE: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)))
 
-        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)
+        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic), true_positive, fake_negative
  
 
 
@@ -409,8 +412,8 @@ class Observation:
         #print('RN, Sky_noise, Emgain, CIC_noise: ', RN, Sky_noise, Emgain, CIC_noise)
         # print(threshold,fraction_signal,fraction_rn,snr_ratio)
         # print(snr_ratio)
-        print("INTERP: Emgain = %0.2f, RN = %0.2f, flux = %0.2f, smearing = %0.2f"%(np.unique(Emgain),np.unique(RN),np.unique(flux),np.unique( self.smearing)))
-        print("INTERP: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(np.unique(threshold),np.unique(fraction_signal),np.unique(fraction_rn),np.unique(snr_ratio)))
+        # print("INTERP: Emgain = %0.2f, RN = %0.2f, flux = %0.2f, smearing = %0.2f"%(np.unique(Emgain),np.unique(RN),np.unique(flux),np.unique( self.smearing)))
+        # print("INTERP: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(np.unique(threshold),np.unique(fraction_signal),np.unique(fraction_rn),np.unique(snr_ratio)))
         return threshold, fraction_signal, fraction_rn, snr_ratio#np.nanmax(SNR1/SNR_analogic)
  
    
@@ -618,7 +621,68 @@ class ExposureTimeCalulator(widgets.HBox):
 
 
 # ETC = ExposureTimeCalulator(EM_gain=1700,RN=65, smearing=0.8,Dard_current=1,x_axis='exposure_time',counting_mode=False,follow_temp=True)
-self = Observation(EM_gain=1700,RN=65, smearing=0.6,Dard_current=1,counting_mode=True)
+# %load_ext line_profiler
+self =  Observation(EM_gain=1700,RN=65, smearing=0.6,Dard_current=1,counting_mode=True)
+# %lprun -f Observation.compute_optimal_threshold 
 self.compute_optimal_threshold(plot_=True)
+# %lprun -f  self.compute_optimal_threshold(plot_=True)
 # print("\n")
 # a=Observation(EM_gain=1700,RN=65, smearing=0.8,Dard_current=1,counting_mode=True).interpolate_optimal_threshold(plot_=True)
+
+
+#%%
+
+n=10
+
+from astropy.io import fits
+from tqdm import tqdm
+# n=6
+gains=np.linspace(800,2500,n)
+rons=np.linspace(30,120,n)
+fluxes=np.linspace(0.01,0.7,n)
+smearings=np.linspace(0,2,n)
+
+print(gains,rons,fluxes,smearings)
+#normally I should also make evolve 
+
+threshold2 = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+fraction_flux2 = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+fraction_gain2 = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+snrs_2 = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+true_pos = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+fake_negs = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+
+gi = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+ri = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+fi = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+si = np.zeros((len(gains),len(rons),len(fluxes),len(smearings)))
+
+for i in tqdm(range(len(gains))):
+    for j  in tqdm(range(len(rons))):
+        for k in range(len(fluxes)):
+            for l in range(len(smearings)):
+                t,f1,f2,snr,tp,fn = Observation(exposure_time=np.array([50,50]), EM_gain=gains[i], RN=rons[j],smearing=smearings[l],counting_mode=True).compute_optimal_threshold(flux=fluxes[k],plot_=False)#1.5)#2022
+                # t,f1,f2,snr = Observation(exposurenhu_time=50, EM_gain=gains[i], RN=rons[j],smearing=smearings[l],counting_mode=True).interpolate_optimal_threshold(flux=fluxes[k],plot_=False)#1.5)#2022
+                # t,f1,f2,snr = np.unique(t), np.unique(f1), np.unique(f2), np.unique(snr)
+                threshold2[i,j,k,l] = t
+                fraction_flux2[i,j,k,l] = f1
+                fraction_gain2[i,j,k,l] = f2    
+                snrs_2[i,j,k,l] = snr  
+                true_pos[i,j,k,l]  =tp
+                fake_negs[i,j,k,l] = fn
+
+                gi[i,j,k,l] = gains[i]
+                ri[i,j,k,l] = rons[j]
+                fi[i,j,k,l] = fluxes[k]
+                si[i,j,k,l] = smearings[l]
+                
+# fits.HDUList([fits.PrimaryHDU(threshold2)]).writeto('interp_threshold_%i.fits'%(n),overwrite=True)
+# fits.HDUList([fits.PrimaryHDU(fraction_flux2)]).writeto('interp_fraction_flux_%i.fits'%(n),overwrite=True)
+# fits.HDUList([fits.PrimaryHDU(fraction_gain2)]).writeto('interp_fraction_rn_%i.fits'%(n),overwrite=True)
+# fits.HDUList([fits.PrimaryHDU(snrs_2)]).writeto('interp_snr_max_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(threshold2)]).writeto('threshold_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(fraction_flux2)]).writeto('fraction_flux_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(fraction_gain2)]).writeto('fraction_rn_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(snrs_2)]).writeto('snr_max_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(true_pos)]).writeto('true_pos_%i.fits'%(n),overwrite=True)
+fits.HDUList([fits.PrimaryHDU(fake_negs)]).writeto('fake_negs_%i.fits'%(n),overwrite=True)
