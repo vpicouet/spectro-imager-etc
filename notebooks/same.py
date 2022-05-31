@@ -309,7 +309,7 @@ class Observation:
         # plt.semilogy(b,signal1/np.sqrt((signal1+noise+rn_noise**2)))
         # plt.semilogy(b,signal1/(signal1+0.1*noise+rn_noise**2))
         # plt.plot(b,signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2))
-        SNR1 = pc*signal1/np.sqrt(1.41*signal1+noise+np.array(rn_noise)**2)
+        SNR1 = pc*signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)
         SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
         SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(Emgain * ConversionGain))**2)
         # print('SNR_analogic = ',SNR_analogic)
@@ -361,7 +361,7 @@ class Observation:
 
         # print("MEASURE: Threshold = %0.2f, Signal fraction = %0.2f, RN fraction = %0.2f, snr_ratio = %0.2f"%(threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)))
 
-        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic), true_positive, fake_negative
+        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax((SNR1/pc)/SNR_analogic), true_positive, fake_negative
  
 
 
