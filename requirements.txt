@@ -12,6 +12,7 @@ voila-material
 ipython
 ipympl
 plotly
+cmocean
 
 #google_drive_downloader
 #ipyvolume
