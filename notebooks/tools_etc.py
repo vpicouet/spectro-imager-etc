@@ -40,7 +40,7 @@ The fact that you are presently reading this means that you have had
 knowledge of the CeCILL-B license and that you accept its terms.
 """
 
-from pyds9plugin.DS9Utils import verboseprint
+# from pyds9plugin.DS9Utils import #verboseprint
 import numpy as np
 from astropy.table import Table
 import matplotlib.pyplot as plt
@@ -74,15 +74,15 @@ def AddFieldAftermatching(
             ColumnCat = Table.read(path2)
         except:
             ColumnCat = Table.read(path2, format="ascii")
-    verboseprint("cat 1 : %i lines" % (len(FinalCat)))
-    verboseprint("cat 2 : %i lines" % (len(ColumnCat)))
+    # #verboseprint("cat 1 : %i lines" % (len(FinalCat)))
+    # #verboseprint("cat 2 : %i lines" % (len(ColumnCat)))
     # print(ColumnCat['ZFLAG'])
-    verboseprint(ColumnCat)
+    # #verboseprint(ColumnCat)
     if query is not None:
         ColumnCat = apply_query(
             cat=ColumnCat, query=query, path=None, new_path=None, delete=True
         )
-        verboseprint(ColumnCat)
+        #verboseprint(ColumnCat)
         mask = np.isfinite(ColumnCat[radec2[0]]) & np.isfinite(ColumnCat[radec2[1]])
         ColumnCat = ColumnCat[mask]
     # print(ColumnCat['ZFLAG'])
@@ -101,11 +101,11 @@ def AddFieldAftermatching(
         except Exception:
             catalog = SkyCoord(ra=FinalCat[radec1[0]], dec=FinalCat[radec1[1]])
         #        idx, d2d, d3d = catalog.match_to_catalog_sky(c[mask])
-        verboseprint(catalog)
-        verboseprint(c)
+        # #verboseprint(catalog)
+        # #verboseprint(c)
         idx, d2d, d3d = catalog.match_to_catalog_sky(c)
         mask = 3600 * np.array(d2d) < distance
-        verboseprint("Number of matches < %0.2f arcsec :  %i " % (distance, mask.sum()))
+        # #verboseprint("Number of matches < %0.2f arcsec :  %i " % (distance, mask.sum()))
 
     elif len(radec1) == 1:
         import pandas as pd
@@ -128,7 +128,7 @@ def AddFieldAftermatching(
         new_field = field
     idx_ = idx[mask]
     for fieldi, new_field in zip(field, new_field):
-        verboseprint("Adding field " + fieldi + " " + new_field)
+        # #verboseprint("Adding field " + fieldi + " " + new_field)
         if new_field not in FinalCat.colnames:
             if type(ColumnCat[fieldi][0]) == np.ndarray:
                 FinalCat[new_field] = (
@@ -136,9 +136,9 @@ def AddFieldAftermatching(
                 )
             else:
                 FinalCat[new_field] = -99.00
-        verboseprint(FinalCat[new_field])
+        # #verboseprint(FinalCat[new_field])
         FinalCat[new_field][mask] = ColumnCat[fieldi][idx_]
-        # verboseprint(FinalCat[new_field])
+        # #verboseprint(FinalCat[new_field])
     return FinalCat
 
 
@@ -1075,7 +1075,7 @@ def SimulateFIREBallemCCDImage(
         xs = slits["Y_IMAGE"] 
         ys = slits["X_IMAGE"] - 1066 + OSregions[0]
         index = (ys > OS1) & (ys < OS2)
-        verboseprint(xs, ys)
+        #verboseprint(xs, ys)
         factor_lya = 0.1#7
         for yi, xi, centre,mag in zip(np.array(ys[index]) - OS1, xs[index],slits["wave"][index],slits["nuv_mag"][index][:]):
             # xi =
@@ -1101,7 +1101,7 @@ def SimulateFIREBallemCCDImage(
                 source_im = addAtPos(source_im, 1*gal.T, [int(xi), int(yi)])
                 # source_im = addAtPos(source_im, 1*profile_line, [int(xi), int(yi)])
             else:
-                verboseprint(xi, yi)
+                #verboseprint(xi, yi)
                 i = np.argmin(abs(centre-trans["col1"]))
                 print(i)
                 gal2 = gal*trans["trans_conv"][i-50:i+50]
