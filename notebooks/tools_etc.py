@@ -145,10 +145,10 @@ def AddFieldAftermatching(
 #%%
 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from pyds9plugin.DS9Utils import PlotFit1D
 
 
 def init_values(bins, val, val_os, plot_=False):
+    from pyds9plugin.DS9Utils import PlotFit1D
     bins_os = bins
     os_v = val_os
     bias = bins_os[np.nanargmax(val_os)] + 0.5  #  #ADDED xdata[np.nanargmax(ydata)]
