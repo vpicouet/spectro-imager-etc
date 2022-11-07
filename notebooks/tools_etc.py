@@ -955,10 +955,13 @@ def addAtPos(M1, M2, center):
     coor_x, coor_y = center 
     coor_x, coor_y = coor_x - int(size_x/2), coor_y - int(size_y/2)
     end_x, end_y = (coor_x + size_x), (coor_y + size_y)
-    try:
-        M1[coor_x:end_x, coor_y:end_y] = M1[coor_x:end_x, coor_y:end_y] + M2
-    except ValueError:
-        pass
+    # try:
+        
+    sx, sy =  np.shape(M1[coor_x:end_x, coor_y:end_y])
+    a = M1[coor_x:end_x, coor_y:end_y] + M2[:sx,:sy]
+    M1[coor_x:end_x, coor_y:end_y] = a
+    # except ValueError:
+    #     pass
     return M1
 
 def variable_smearing_kernels(
@@ -985,7 +988,7 @@ def variable_smearing_kernels(
 
 def SimulateFIREBallemCCDImage(
 #     ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=1, p_sCIC=1, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Spectra", Rx=8, Ry=8, size=[3216, 2069], OSregions=[1066, 2124], name="Auto", spectra="-", cube="-", n_registers=604, save=False
-    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True):
+    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45):
     #%%
     # imaADU, imaADU_stack, cube_stack, source_im = SimulateFIREBallemCCDImage(source="Field", size=[3216, 2069], OSregions=[1066, 2124],p_pCIC=0.0005,exposure=50,Dark=0.5/3600,cosmic_ray_loss=0,Smearing=0.3,stack=3600*2/55,RN=RN,Rx=5,Ry=5,readout_time=5)
 
@@ -1044,10 +1047,10 @@ def SimulateFIREBallemCCDImage(
         flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
         throughput = 0.13*0.9
         atm = 0.45
-        detector = 0.45
+        # detector = QE#0.45
         area = 7854
         dispersion = 46.6/10
-        elec_pix = flux * throughput * atm * detector * area /dispersion# should not be multiplied by exposure time here
+        elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
         # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
         profile =  elec_pix* Gaussian1D.evaluate(np.arange(100),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(100),  1,  50, Rx).sum()
         source_im[:,:] += profile
@@ -1057,10 +1060,9 @@ def SimulateFIREBallemCCDImage(
         ConvolveSlit2D_PSF_75muWidth = lambda xy, amp, L, xo, yo, sigmax2, sigmay2: ConvolveSlit2D_PSF(xy, amp, 2.5, L, xo, yo, sigmax2, sigmay2)
         source_im += ConvolveSlit2D_PSF_75muWidth((x, y), flux , 9, ly / 2, lx / 2, Rx, Ry).reshape(lx, ly)
     elif source == "Fibre":
-        #print("Create fibre source, FWHM: ", 2.353 * Rx, 2.353 * Ry)
         fibre = convolvePSF(radius_hole=10, fwhmsPSF=[2.353 * Rx, 2.353 * Ry], unit=1, size=(201, 201), Plot=False)  # [:,OSregions[0]:OSregions[1]]
         source_im = addAtPos(source_im, fibre, (int(lx / 2), int(ly / 2)))
-        #print("Done")
+ 
     elif source[:5] == "Field":
         ConvolveSlit2D_PSF_75muWidth = lambda xy, amp, L, xo, yo, sigmax2, sigmay2: ConvolveSlit2D_PSF(xy, amp, 2.5, L, xo, yo, sigmax2, sigmay2)
         ws = [2025, 2062, 2139]
@@ -1069,27 +1071,31 @@ def SimulateFIREBallemCCDImage(
 
         slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/targets_F2.csv")
         trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
-        trans["trans_conv"] = np.convolve(trans["col2"],5,mode="same")
-        slits = slits[(slits["Z"]>0.5)&(slits["Z"]<0.8)]
+        trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
+        plt.plot( trans["col1"], trans["trans_conv"])
+        slits = slits[((slits["Z"]>0.5)&(slits["Z"]<0.8))|(slits["Z"]==0)]
         slits["wave"] = (1+slits["Z"]) * 121.6
+        slits["wave"][slits["Z"]==0] = 200
         xs = slits["Y_IMAGE"] 
         ys = slits["X_IMAGE"] - 1066 + OSregions[0]
         index = (ys > OS1) & (ys < OS2)
         #verboseprint(xs, ys)
-        factor_lya = 0.1#7
-        for yi, xi, centre,mag in zip(np.array(ys[index]) - OS1, xs[index],slits["wave"][index],slits["nuv_mag"][index][:]):
+        for i in range((len(ys[index]))):
             # xi =
+            yi, xi, centre,mag = np.array(ys[index][i]) - OS1, xs[index][i],slits["wave"][index][i],slits["nuv_mag"][index][i]
+            z = slits["Z"][index][i]
+            factor_lya = 0.05 if z>0 else 0
+
             if 1==1:
                 wavelength=2000
                 flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
                 throughput = 0.13*0.9
                 atm = 0.45
-                detector = 0.45
                 area = 7854
                 dispersion = 46.6/10
-                elec_pix = flux * throughput * atm * detector * area /dispersion# should not be multiplied by exposure time here
+                elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                n = 100
+                n = 300
                 gal = np.zeros((n,n))
                 cont = Gaussian1D.evaluate(np.arange(n),  1,  int(n/2), Rx) 
                 new_cont = cont/cont.sum()
@@ -1098,7 +1104,10 @@ def SimulateFIREBallemCCDImage(
                 line /= line.sum()
                 profile_line =  factor_lya * (3700/1)*elec_pix* line * cont.sum()
                 gal[:,:] += profile_cont+profile_line
-                source_im = addAtPos(source_im, 1*gal.T, [int(xi), int(yi)])
+                j = np.argmin(abs(centre-trans["col1"]))
+                gal_absorbed = gal.T*trans["trans_conv"][j-int(n/2):j+int(n/2)]
+                source_im = addAtPos(source_im, 1*gal_absorbed, [int(xi), int(yi)])
+                # imshow(gal.T)
                 # source_im = addAtPos(source_im, 1*profile_line, [int(xi), int(yi)])
             else:
                 #verboseprint(xi, yi)
@@ -1107,8 +1116,6 @@ def SimulateFIREBallemCCDImage(
                 gal2 = gal*trans["trans_conv"][i-50:i+50]
                 source_im = addAtPos(source_im, 1*gal2, [int(xi), int(yi)])
 
-            #TODO take into account the redshift and type of the source
-            #TODO take into account magnitude
             #TODO add the atmosphere absorption/emission features
             #TODO add the stacking 
             # source_im += ConvolveSlit2D_PSF_75muWidth((x, y), 40000 * flux, 9, yi, xi, Rx, Ry).reshape(lx, ly)
