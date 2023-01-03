@@ -988,7 +988,7 @@ def variable_smearing_kernels(
 
 def SimulateFIREBallemCCDImage(
 #     ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=1, p_sCIC=1, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Spectra", Rx=8, Ry=8, size=[3216, 2069], OSregions=[1066, 2124], name="Auto", spectra="-", cube="-", n_registers=604, save=False
-    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45):
+    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45, field="targets_F2.csv"):
     #%%
     # imaADU, imaADU_stack, cube_stack, source_im = SimulateFIREBallemCCDImage(source="Field", size=[3216, 2069], OSregions=[1066, 2124],p_pCIC=0.0005,exposure=50,Dark=0.5/3600,cosmic_ray_loss=0,Smearing=0.3,stack=3600*2/55,RN=RN,Rx=5,Ry=5,readout_time=5)
 
@@ -1069,7 +1069,7 @@ def SimulateFIREBallemCCDImage(
         file = '/Users/Vincent/Github/fireball2-etc/notebooks/10pc/cube_204nm_guidance0.5arcsec_slit100um_total_fc_rb_detected.fits'#%(pc,wave,slit)
         gal=fits.open(file)[0].data * 0.7 #cf athmosphere was computed at 45km
 
-        slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/targets_F2.csv")
+        slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field)
         trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
         trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
         plt.plot( trans["col1"], trans["trans_conv"])
@@ -1082,7 +1082,7 @@ def SimulateFIREBallemCCDImage(
         #verboseprint(xs, ys)
         for i in range((len(ys[index]))):
             # xi =
-            yi, xi, centre,mag = np.array(ys[index][i]) - OS1, xs[index][i],slits["wave"][index][i],slits["nuv_mag"][index][i]
+            yi, xi, centre,mag = np.array(ys[index][i]) - OS1, xs[index][i],slits["wave"][index][i],slits["NUV_ned"][index][i]
             z = slits["Z"][index][i]
             factor_lya = 0.05 if z>0 else 0
 
