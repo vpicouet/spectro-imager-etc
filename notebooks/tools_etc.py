@@ -45,7 +45,7 @@ import numpy as np
 from astropy.table import Table
 import matplotlib.pyplot as plt
 import sys
-from pyds9plugin.DS9Utils import create_ds9_regions, DS9n
+# from pyds9plugin.DS9Utils import create_ds9_regions, DS9n
 def AddFieldAftermatching(
     FinalCat=None,
     ColumnCat=None,
