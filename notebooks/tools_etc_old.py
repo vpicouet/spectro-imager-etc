@@ -44,8 +44,8 @@ knowledge of the CeCILL-B license and that you accept its terms.
 import numpy as np
 from astropy.table import Table
 import matplotlib.pyplot as plt
-import sys
-from pyds9plugin.DS9Utils import create_ds9_regions, DS9n
+
+
 def AddFieldAftermatching(
     FinalCat=None,
     ColumnCat=None,
@@ -987,8 +987,11 @@ def variable_smearing_kernels(
 
 
 def SimulateFIREBallemCCDImage(
-    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45, field="targets_F2.csv",QElambda=True,atmlambda=True):
+#     ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=1, p_sCIC=1, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Spectra", Rx=8, Ry=8, size=[3216, 2069], OSregions=[1066, 2124], name="Auto", spectra="-", cube="-", n_registers=604, save=False
+    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45, field="targets_F2.csv"):
     #%%
+    # imaADU, imaADU_stack, cube_stack, source_im = SimulateFIREBallemCCDImage(source="Field", size=[3216, 2069], OSregions=[1066, 2124],p_pCIC=0.0005,exposure=50,Dark=0.5/3600,cosmic_ray_loss=0,Smearing=0.3,stack=3600*2/55,RN=RN,Rx=5,Ry=5,readout_time=5)
+
     # ConversionGain=0.53
     # EmGain=1500
     # Bias="Auto"
@@ -1015,21 +1018,17 @@ def SimulateFIREBallemCCDImage(
 
     # size=[3216, 2069]
     # OSregions=[1066, 2124]
-    # EmGain=1500; Bias=0; RN=80; p_pCIC=1; p_sCIC=0; Dark=1/3600; Smearing=1; SmearExpDecrement=50000; exposure=50; flux=1; sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;readout_time=5;stack=100;QE=0.5
     from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
     from scipy.sparse import dia_matrix
-    from scipy.interpolate import interp1d
-
 
     OS1, OS2 = OSregions
-    # ConversionGain=1
+    ConversionGain=1
     Bias=0
     image = np.zeros((size[1], size[0]), dtype="float64")
     image_stack = np.zeros((size[1], size[0]), dtype="float64")
 
     # dark & flux
     source_im = 0 * image[:, OSregions[0] : OSregions[1]]
-    source_im_wo_atm = 0 * image[:, OSregions[0] : OSregions[1]]
     lx, ly = source_im.shape
     y = np.linspace(0, lx - 1, lx)
     x = np.linspace(0, ly - 1, ly)
@@ -1038,97 +1037,25 @@ def SimulateFIREBallemCCDImage(
     # Source definition. For now the flux is not normalized at all, need to fix this
     # Cubes still needs to be implememted, link to detector model or putting it here?
     # if os.path.isfile(cube):
-    throughput = 0.13*0.9
-    atm = 0.45
-    area = 7854
-    dispersion = 46.6/10
-    wavelength=2000
-            #%%
     if source == "Flat-field":
         source_im += flux
     elif source == "Dirac":
         source_im += Gaussian2D.evaluate(x, y,  flux, ly / 2, lx / 2, Ry, Rx, 0)
     elif "Spectra" in source:
-        if "m=" not in source:
-            # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
-            a = Table.read("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
-            slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
-            trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
-            QE = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/PSFDetector/efficiencies/QE_2022.csv")
-            QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
-            trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
-            trans = trans[:-5]
-            atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
-
-            a["photons"] = a["FLUX"]/9.93E-12   
-            a["e_pix_sec"]  = a["photons"] * throughput * atm  * area /dispersion
-            nsize,nsize2 = 100,500
-            source_im=np.zeros((nsize,nsize2))
-            source_im_wo_atm=np.zeros((nsize2,nsize))
-            mask = (a["WAVELENGTH"]>1960) & (a["WAVELENGTH"]<2280)
-            lmax = a["WAVELENGTH"][mask][np.argmax( a["e_pix_sec"][mask])]
-            # plt.plot( a["WAVELENGTH"],a["e_pix_sec"])
-            # plt.plot( a["WAVELENGTH"][mask],a["e_pix_sec"][mask])
-            f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])#
-            profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
-            subim = np.zeros((nsize2,nsize))
-            wavelengths = np.linspace(lmax-nsize2/2/dispersion,lmax+nsize2/2/dispersion,nsize2)
-
-            if 1==0:
-                # source_im=np.zeros((100,100))
-                # # plt.plot(a["WAVELENGTH"][mask],a["e_pix_exp"][mask])
-                # profile =   Gaussian1D.evaluate(np.arange(100),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(100),  1,  50, Rx).sum()
-                # i = np.argmin(abs(a["WAVELENGTH"]-1960))
-                # source_im[:,:] +=   profile
-                # source_im = source_im.T*a["e_pix_sec"][i:i+100]
-                
-                
-                fig,(ax0,ax1,ax2) = plt.subplots(3,1)
-                ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="Atmosphere impact",alpha=0.3)
-                ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="QE impact",alpha=0.3)
-                ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
-                ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)/(f(wavelengths)* atm_trans(wavelengths)).ptp(),label="Spectra * Atm")
-                ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths)/( f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths)).ptp(),label="Spectra * Atm * QE")
-                ax2.plot(wavelengths,atm_trans(wavelengths) ,label="Atmosphere")
-                ax2.plot(wavelengths,QE(wavelengths) ,label="QE")
-                ax0.legend()
-                ax1.legend()
-                ax2.legend()
-                ax0.set_ylabel("e/pix/sec")
-                ax1.set_ylabel("Mornalized prof")
-                ax2.set_ylabel("%")
-                ax2.set_xlabel("wavelength")
-                ax0.set_title(source.split(" ")[-1])
-                fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source.split(" ")[-1]))
-                plt.show()
-            QE = QE(wavelengths) if QElambda else QE(lmax) 
-            atm_trans = atm_trans(wavelengths) if atmlambda else atm_trans(lmax) 
-            source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
-            # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-        else:
-            #%%
-            mag=float(source.split("m=")[-1])
-            factor_lya = 0.05 
-            flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
-            elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
-            with_line = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, Ry)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, Ry).sum()
-            # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-            profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx).sum())
-            source_im = source_im.T
-            source_im[:,:] += profile
-            source_im = source_im.T
-
-            # a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
-            # a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
-            # f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])
-            # profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
-            # subim = np.zeros((nsize2,nsize))
-            # wavelengths = np.linspace(2060-yi/dispersion,2060+(1000-yi)/dispersion,nsize2)
-            # source_im[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) * atm_trans(wavelengths) * QE(wavelengths)
-            # source_im_wo_atm[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-
-#%%
-            # print(exposure*profile.max(), exposure*profile.sum())
+        mag=float(source.split("m=")[-1])
+        wavelength=2000
+        flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
+        throughput = 0.13*0.9
+        atm = 0.45
+        # detector = QE#0.45
+        area = 7854
+        dispersion = 46.6/10
+        elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
+        # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
+        profile =  elec_pix* Gaussian1D.evaluate(np.arange(100),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(100),  1,  50, Rx).sum()
+        source_im[:,:] += profile
+        # print(exposure*profile.max(), exposure*profile.sum())
+        source_im = source_im.T
     elif source == "Slit":
         ConvolveSlit2D_PSF_75muWidth = lambda xy, amp, L, xo, yo, sigmax2, sigmay2: ConvolveSlit2D_PSF(xy, amp, 2.5, L, xo, yo, sigmax2, sigmay2)
         source_im += ConvolveSlit2D_PSF_75muWidth((x, y), flux , 9, ly / 2, lx / 2, Rx, Ry).reshape(lx, ly)
@@ -1137,149 +1064,76 @@ def SimulateFIREBallemCCDImage(
         source_im = addAtPos(source_im, fibre, (int(lx / 2), int(ly / 2)))
  
     elif source[:5] == "Field":
-       #%%
         ConvolveSlit2D_PSF_75muWidth = lambda xy, amp, L, xo, yo, sigmax2, sigmay2: ConvolveSlit2D_PSF(xy, amp, 2.5, L, xo, yo, sigmax2, sigmay2)
         ws = [2025, 2062, 2139]
         file = '/Users/Vincent/Github/fireball2-etc/notebooks/10pc/cube_204nm_guidance0.5arcsec_slit100um_total_fc_rb_detected.fits'#%(pc,wave,slit)
         gal=fits.open(file)[0].data * 0.7 #cf athmosphere was computed at 45km
 
-        slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
+        slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field)
         trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
-        QE = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/PSFDetector/efficiencies/QE_2022.csv")
-        QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
         trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
-        trans = trans[:-5]
-        atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
-        # plt.plot( trans["col1"], trans["trans_conv"])
-        
-        #passer en pandas
-        #couper ce qui sort du detecteur
-        #puis tranformer direct xmm y_lin en detecteur sans prendre en compte le redshift
-        # if "yline_mm" not in slits.columns:
-        #     slits["yline_mm"] = slits["y_mm"]
-        # print(len(slits))
-        try:
-            slits.loc[ ~np.isfinite(slits["NUV_ned"]), 'NUV_ned'] = slits.loc[ ~np.isfinite(slits["NUV_ned"])]["FLUX_g"]+2#29.9
-        except KeyError:
-            slits.loc[ ~np.isfinite(slits["NUV_ned"]), 'NUV_ned']  = 29.9
-        slits["yline_mm"] = 0
-        slits["em_line"] = 0
-        slits["wave"] = 0
-        slits["X_IMAGE"] = (slits["y_mm"]+6.5) / 0.013
-        slits["Y_IMAGE"] =( -slits["x_mm"]+13) / 0.013
-        queries = ["Z<0.01","(Z>0.044 & Z<0.072) | (Z>0.081 & Z<0.117)","(Z>0.285 & Z<0.320) | (Z>0.331 & Z<0.375)","(Z>0.59 & Z<0.682) | (Z>0.696 & Z<0.78) "," (Z>0.926 & Z<0.98)| (Z>0.996 & Z<1.062) ","(Z>1.184 & Z<1.245) | (Z>1.263 & Z<1.338)"]
-        for q,line in zip(queries,[2060,1908.7,1549.5,1215.67,1033.8,911.8]):
-            if len(slits.query(q))>0:
-                slits.loc[slits.eval(q), 'em_line'] =  line
-                slits.loc[slits.eval(q), 'wave'] = (slits.query(q)['Z']+1)* line
-                slits.loc[slits.eval(q), 'yline_mm'] =  slits.query(q)['y_mm']  + ((slits.query(q)['Z']+1)* line-2060)*dispersion*0.013
-                slits.loc[slits.eval(q), 'X_IMAGE_line'] =  slits.query(q)['X_IMAGE']  + ((slits.query(q)['Z']+1)* line-2060)*dispersion
-        Table.from_pandas(slits).write("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/test/" + field,overwrite=True)        
-        slits = slits.query("x_mm>-13  & x_mm<13 & y_mm>-6.55 & y_mm<6.55 & yline_mm>-6.55 & yline_mm<6.55 & X_IMAGE_line>-1000")
-
+        plt.plot( trans["col1"], trans["trans_conv"])
+        slits = slits[((slits["Z"]>0.5)&(slits["Z"]<0.8))|(slits["Z"]==0)]
+        slits["wave"] = (1+slits["Z"]) * 121.6
+        slits["wave"][slits["Z"]==0] = 200
         xs = slits["Y_IMAGE"] 
-        ys = slits["X_IMAGE"]  + OSregions[0]
-        # ys = slits["X_IMAGE"] - 1066 + OSregions[0]
-        nsize =50
-        nsize2=len(source_im[0, OSregions[0] : OSregions[1]])
+        ys = slits["X_IMAGE"] - 1066 + OSregions[0]
+        index = (ys > OS1) & (ys < OS2)
+        #verboseprint(xs, ys)
+        for i in range((len(ys[index]))):
+            # xi =
+            yi, xi, centre,mag = np.array(ys[index][i]) - OS1, xs[index][i],slits["wave"][index][i],slits["NUV_ned"][index][i]
+            z = slits["Z"][index][i]
+            factor_lya = 0.05 if z>0 else 0
 
-        for i, line in slits.iterrows():
-            yi, xi, centre,mag = np.array(line["X_IMAGE"]  + OSregions[0]) - OS1, line["Y_IMAGE"] ,line["wave"],line["NUV_ned"]
-            z = line["Z"]
-            factor_lya = 0.05 if z>0.001 else 0
-            # if ~np.isfinite(mag):
-            #     mag = 26 
-            wavelength=2000
-            flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
-            elec_pix = flux * throughput * atm * area /dispersion# should not be multiplied by exposure time here
-            if "MAIN_ID" in slits.columns:
-                if line["MAIN_ID"].replace(" ", "") in ["7C1821+6419","87GB004432.0+030343","PG1538+47"]:
-                    # if line["spectra"]!="None":
-                    a = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/h_%sfos_spc.fits"%(line["MAIN_ID"].replace(" ", "")))
-                    a["photons"] = a["FLUX"]/9.93E-12   
-                    a["e_pix_sec"]  = a["photons"]  * throughput * atm * area /dispersion
-                    f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])#
-                else:
-                    a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
-                    a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
-                    f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])
-                    print(xi,line["X_IMAGE_line"])
+            if 1==1:
+                wavelength=2000
+                flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
+                throughput = 0.13*0.9
+                atm = 0.45
+                area = 7854
+                dispersion = 46.6/10
+                elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
+                # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
+                n = 300
+                gal = np.zeros((n,n))
+                cont = Gaussian1D.evaluate(np.arange(n),  1,  int(n/2), Rx) 
+                new_cont = cont/cont.sum()
+                profile_cont =  (1-factor_lya) * elec_pix * new_cont
+                line = Gaussian2D.evaluate(np.meshgrid(np.arange(n),np.arange(n))[0],np.meshgrid(np.arange(n),np.arange(n))[1],  1,  int(n/2),int(n/2), Rx, 2*Ry,0) 
+                line /= line.sum()
+                profile_line =  factor_lya * (3700/1)*elec_pix* line * cont.sum()
+                gal[:,:] += profile_cont+profile_line
+                j = np.argmin(abs(centre-trans["col1"]))
+                gal_absorbed = gal.T*trans["trans_conv"][j-int(n/2):j+int(n/2)]
+                source_im = addAtPos(source_im, 1*gal_absorbed, [int(xi), int(yi)])
+                # imshow(gal.T)
+                # source_im = addAtPos(source_im, 1*profile_line, [int(xi), int(yi)])
             else:
-                a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
-                a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
-                f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])
-                print(xi,line["X_IMAGE_line"])
-            
-            profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
-            subim = np.zeros((nsize2,nsize))
-            wavelengths = np.linspace(2060-yi/dispersion,2060+(1000-yi)/dispersion,nsize2)
-            source_im[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) * atm_trans(wavelengths) * QE(wavelengths)
-            source_im_wo_atm[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-            # source_im_wo_atm[-int(xi+nsize/2):-int(xi-nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-            if ~np.isfinite(f(wavelengths).max()):
-                sys.exit()
-            # source_im=source_im.T
-            if "spectra" in slits.columns:
-                if line["spectra"]!="None":
-                    fig,(ax0,ax1,ax2) = plt.subplots(3,1)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="Atmosphere impact",alpha=0.3)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="QE impact",alpha=0.3)
-                    ax1.plot(wavelengths, f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)/(f(wavelengths)* atm_trans(wavelengths)).ptp(),label="Spectra * Atm")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths)/( f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths)).ptp(),label="Spectra * Atm * QE")
-                    ax2.plot(wavelengths,atm_trans(wavelengths) ,label="Atmosphere")
-                    ax2.plot(wavelengths,QE(wavelengths) ,label="QE")
-                    ax0.legend()
-                    ax1.legend()
-                    ax2.legend()
-                    ax0.set_ylabel("e/pix/sec")
-                    ax1.set_ylabel("Mornalized prof")
-                    ax2.set_ylabel("%")
-                    ax2.set_xlabel("wavelength")
-                    ax0.set_title(line["spectra"])
-                    plt.show()
+                #verboseprint(xi, yi)
+                i = np.argmin(abs(centre-trans["col1"]))
+                print(i)
+                gal2 = gal*trans["trans_conv"][i-50:i+50]
+                source_im = addAtPos(source_im, 1*gal2, [int(xi), int(yi)])
 
-                    
-                    #%%
-        if 1==0:
-                if 1==1:
-                    wavelength=2000
-                    flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
-                    elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
-                    # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                    n = 300
-                    gal = np.zeros((n,n))
-                    cont = Gaussian1D.evaluate(np.arange(n),  1,  int(n/2), Rx) 
-                    new_cont = cont/cont.sum()
-                    profile_cont =  (1-factor_lya) * elec_pix * new_cont
-                    line = Gaussian2D.evaluate(np.meshgrid(np.arange(n),np.arange(n))[0],np.meshgrid(np.arange(n),np.arange(n))[1],  1,  int(n/2),int(n/2), Rx, 2*Ry,0) 
-                    line /= line.sum()
-                    profile_line =  factor_lya * (3700/1)*elec_pix* line * cont.sum()
-                    gal[:,:] += profile_cont+profile_line
-                    j = np.argmin(abs(centre-trans["col1"]))
-                    gal_absorbed = gal.T*trans["trans_conv"][j-int(n/2):j+int(n/2)]
-                    source_im = addAtPos(source_im, 1*gal_absorbed, [int(xi), int(yi)])
-                    # imshow(gal.T)
-                    # source_im = addAtPos(source_im, 1*profile_line, [int(xi), int(yi)])
-                else:
-                    #verboseprint(xi, yi)
-                    i = np.argmin(abs(centre-trans["col1"]))
-                    print(i)
-                    gal2 = gal*trans["trans_conv"][i-50:i+50]
-                    source_im = addAtPos(source_im, 1*gal2, [int(xi), int(yi)])
-
+            #TODO add the atmosphere absorption/emission features
+            #TODO add the stacking 
+            # source_im += ConvolveSlit2D_PSF_75muWidth((x, y), 40000 * flux, 9, yi, xi, Rx, Ry).reshape(lx, ly)
     else:
-
+        
+        # from .FitsCube import FitsCube
+        # cube='/Users/Vincent/Downloads/Safari/lya_cube_merged_with_artificial_source_CU_1pc.fits'
+        # source_im = FitsCube(filename=cube)
+        # print(source.split('='))
         pc = int(float(source.split('=')[1].split('%')[0]))
         wave = int(float(source.split('=')[3]))
         slit = int(float(source.split('=')[2].split('mu')[0]))
         file = '%spc/cube_%snm_guidance0.5arcsec_slit%sum_total_fc_rb_detected.fits'%(pc,wave,slit)
-        fitsim = fits.open(file)[0].data * 0.7 #cf athmosphere was computed at 45km
-        source_im[:fitsim.shape[0],:fitsim.shape[1]]+=fitsim
-
-        
+        source_im+=fits.open(file)[0].data * 0.7 #cf athmosphere was computed at 45km
+        # source_im = np.ones(source_im.shape) * np.linspace(source_im.min(),10*source_im.max(),source_im.shape[0] )
+    # Poisson realisation
+    # print( source_im.shape , sky.shape)
     source_im = (Dark + source_im + sky) * int(exposure)
-    source_im_wo_atm = (Dark + source_im_wo_atm + sky) * int(exposure)
     y_pix=1000
     # print(len(source_im),source_im.shape)
     if readout_time > 10:
@@ -1293,7 +1147,6 @@ def SimulateFIREBallemCCDImage(
     # print(cosmic_ray_loss)
     n_smearing=6
     # image[:, OSregions[0] : OSregions[1]] += source_im
-    # print(image[:, OSregions[0] : OSregions[1]].shape,source_im.shape)
     image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<p_pCIC,dtype=int) , EmGain)
     # take into acount CR losses
     #18%
@@ -1369,12 +1222,17 @@ def SimulateFIREBallemCCDImage(
     imaADU_RN = (readout * ConversionGain).round().astype(type_)
     imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
     imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
+    #15%Q
     if counting:
         imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
     else:
         imaADU_cube = imaADU_stack
+    # print(readout_cube.min())
+    # print(imaADU_cube.min())
+    # imaADU_cube[0,0,0]=-1
+    # else:
+        # imaADU, imaADU_stack, cube_stack,  = 0*source_im, 0*source_im, 0*source_im
+    #%%
 
-
-
-    return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
+    return imaADU, imaADU_stack, imaADU_cube, source_im#imaADU_wo_RN, imaADU_RN
 
