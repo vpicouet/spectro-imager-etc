@@ -987,7 +987,7 @@ def variable_smearing_kernels(
 
 
 def SimulateFIREBallemCCDImage(
-    ConversionGain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45, field="targets_F2.csv",QElambda=True,atmlambda=True):
+    conv_gain=0.53, EmGain=1500, Bias="Auto", RN=80, p_pCIC=0.0005, p_sCIC=0, Dark=5e-4, Smearing=0.7, SmearExpDecrement=50000, exposure=50, flux=1e-3, source="Slit", Rx=8, Ry=8, size=[100, 100], OSregions=[0, -1], name="Auto", spectra="-", cube="-", n_registers=604, sky=0,save=False,stack=1,readout_time=1.5, cosmic_ray_loss=None, counting=True, QE=0.45, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05):
     #%%
     # ConversionGain=0.53
     # EmGain=1500
@@ -1023,6 +1023,7 @@ def SimulateFIREBallemCCDImage(
 
     OS1, OS2 = OSregions
     # ConversionGain=1
+    ConversionGain = conv_gain
     Bias=0
     image = np.zeros((size[1], size[0]), dtype="float64")
     image_stack = np.zeros((size[1], size[0]), dtype="float64")
@@ -1053,7 +1054,7 @@ def SimulateFIREBallemCCDImage(
             # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
             try:
                 a = Table.read("Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
-                slits = Table.read("Targets/2022/" + field).to_pandas()
+                slits = None#Table.read("Targets/2022/" + field).to_pandas()
                 trans = Table.read("transmission_pix_resolution.csv")
                 QE = Table.read("QE_2022.csv")
             except FileNotFoundError: 
@@ -1114,7 +1115,7 @@ def SimulateFIREBallemCCDImage(
         else:
             #%%
             mag=float(source.split("m=")[-1])
-            factor_lya = 0.05 
+            factor_lya = fraction_lya
             flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(wavelength*0.0000000001)/0.0000001))
             elec_pix = flux * throughput * atm * QE * area /dispersion# should not be multiplied by exposure time here
             with_line = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, Ry)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, Ry).sum()
@@ -1363,14 +1364,10 @@ def SimulateFIREBallemCCDImage(
     readout_stack = np.random.normal(Bias, RN/np.sqrt(int(stack)), (size[1], size[0]))
     if counting:
         readout_cube = np.random.normal(Bias, RN, (int(stack),size[1], size[0])).astype("int32")
-
         # print((np.random.rand(source_im.shape[0], source_im.shape[1]) < cosmic_ray_loss).mean())
         #TOKEEP  for cosmic ray masking readout[np.random.rand(source_im.shape[0], source_im.shape[1]) < cosmic_ray_loss]=np.nan
-
         #print(np.max(((image + readout) * ConversionGain).round()))
     #     if np.max(((image + readout) * ConversionGain).round()) > 2 ** 15:
-
-
     imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
     imaADU_RN = (readout * ConversionGain).round().astype(type_)
     imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
@@ -1379,8 +1376,5 @@ def SimulateFIREBallemCCDImage(
         imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
     else:
         imaADU_cube = imaADU_stack
-
-
-
     return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
 
