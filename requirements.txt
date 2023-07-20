@@ -13,6 +13,7 @@ ipython
 plotly
 cmocean
 pandas
+Pillow
 
 #google_drive_downloader
 #ipyvolume
