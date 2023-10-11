@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/vpicouet/fireball2-etc/issues"
   },
-  "homepage": "https://github.com/vpicouet/fireball2-etc#readme"
+  "homepage": "https://github.com/vpicouet/fireball2-etc#readme",
+  "engines": {
+    "node": ">= 6.9.4",
+    "npm": ">= 4.4.0"
+  }
 }
