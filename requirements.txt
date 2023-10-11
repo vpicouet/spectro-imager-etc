@@ -15,6 +15,7 @@ cmocean
 pandas
 Pillow
 cycler
+nbimporter
 
 #google_drive_downloader
 #ipyvolume
