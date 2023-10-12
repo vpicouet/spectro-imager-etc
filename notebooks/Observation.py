@@ -492,5 +492,14 @@ class Observation:
         fraction_signal =interpn(coords, table_fraction_flux, point,bounds_error=False,fill_value=None)
         threshold = interpn(coords, table_threshold, point,bounds_error=False,fill_value=None)
         snr_ratio = interpn(coords, table_snr, point,bounds_error=False,fill_value=None)
+
+        if self.smearing == 0:
+            a = Table.read("fraction_flux.csv")
+            threshold = 5.5
+            fraction_signal = np.interp(self.EM_gain/self.RN,a["G/RN"],a["fractionflux"])
+            # fraction_rn = f(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
+            # fraction_signal = f2(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
+            # snr_ratio = f3(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
+
         return threshold, fraction_signal, fraction_rn, snr_ratio#np.nanmax(SNR1/SNR_analogic)
  
