@@ -20,6 +20,17 @@ from scipy.interpolate import interpn
 # plt.style.use('dark_background')
 # fmt = mticker.FuncFormatter(lambda x, pos: "${}$".format(mticker.ScalarFormatter(useOffset=False, useMathText=True)._formatSciNotation("%1.10e" % np.round(x, 5))))
 
+
+
+import pandas as pd
+sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
+sheet_name = "instruments.csv"
+url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+instruments = Table.from_pandas(pd.read_csv(url))
+instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
+
+
+
 import functools
 np.seterr(invalid='ignore')
 
@@ -96,14 +107,6 @@ table_fraction_flux = fits.open("%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
-import pandas as pd
-sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
-sheet_name = "instruments.csv"
-url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-instruments = Table.from_pandas(pd.read_csv(url))
-instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
-
-
 
 def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
     """Creates variable smearing kernels for inversion
@@ -120,7 +123,7 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 #TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky_LU=10000, readout_time=1.5, guider_noise = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky_LU=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -204,7 +207,7 @@ class Observation:
 
         self.RN_final = self.RN  * self.RN_fraction_kept / self.EM_gain #Are we sure about that? 
         # print(self.RN,  self.RN_fraction_kept , self.EM_gain)
-        self.Additional_background = guider_noise/3600 * self.exposure_time# e/pix/f
+        self.Additional_background = extra_background/3600 * self.exposure_time# e/pix/f
         self.Additional_background_noise = np.sqrt(self.Additional_background * self.ENF)
         
         # number of images taken during one field acquisition (~2h)
@@ -263,11 +266,11 @@ class Observation:
     def PlotNoise(self,title='',x='exposure_time', lw=8):
         """
         Generate a plot of the evolution of the noise budget with one parameter:
-        exposure_time, Sky_LU, acquisition_time, Signal, EM_gain, RN, CIC_charge, Dard_current, readout_time, smearing, temperature, PSF_RMS_det, PSF_RMS_mask, QE, guider_noise, cosmic_ray_loss_per_sec
+        exposure_time, Sky_LU, acquisition_time, Signal, EM_gain, RN, CIC_charge, Dard_current, readout_time, smearing, temperature, PSF_RMS_det, PSF_RMS_mask, QE, extra_background, cosmic_ray_loss_per_sec
         """
         fig, axes= plt.subplots(4, 1, figsize=(12, 8), sharex=True) # fig, (ax1, ax2,ax3) = plt.subplots(3, 1, figsize=(12, 7), sharex=True) #figsize=(9, 5.5)
         ax1, ax2,ax3, ax4  = axes
-        labels = ['%s: %0.3f (%0.1f%%)'%(name,getattr(self,"electrons_per_pix")[self.i,j],100*getattr(self,"electrons_per_pix")[self.i,j]/np.sum(getattr(self,'electrons_per_pix')[self.i,:])) for j,name in enumerate(self.names)]
+        labels = ['%s: %0.3f (%0.1f%%)'%(name,self.electrons_per_pix[self.i,j],100*self.electrons_per_pix[self.i,j]/np.nansum(self.electrons_per_pix[self.i,:])) for j,name in enumerate(self.names)]
 
         # ax1 
         for i,(name,c) in enumerate(zip(self.names,self.colors)):
@@ -280,7 +283,7 @@ class Observation:
         ax2.grid(False)
         self.stackplot1 = ax2.stackplot(getattr(self,x),  np.array(self.electrons_per_pix).T[:,:],alpha=0.7,colors=self.colors,labels=labels)
         ax2.set_ylabel('e-/pix/frame')
-        ax2.legend(loc='upper right')
+        ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%(np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
         ax2.set_xlim((getattr(self,x).min(),getattr(self,x).max()))
 
         # ax3
