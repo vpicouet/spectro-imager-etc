@@ -183,11 +183,11 @@ class Observation:
         self.Dark_current_noise =  np.sqrt(self.Dark_current_f * self.ENF)
         
         #for now we put the regular QE without taking into account the photon kept fracton, because then infinite loop. Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
-        self.pixel_scale  = (self.pixel_scale*np.pi/180/3600)
+        self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
         self.area *= 100 * 100#m2 to cm2
         if counting_mode:
-            self.factor_el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.area # (self.area = np.pi*diameter**2/4)
-            self.sky = self.Sky_LU*self.factor_el*self.exposure_time  # el/pix/frame
+            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.area # (self.area = np.pi*diameter**2/4)
+            self.sky = self.Sky_LU*self.factor_LU2el*self.exposure_time  # el/pix/frame
             self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
@@ -199,8 +199,11 @@ class Observation:
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
 
-        self.factor_el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area # (self.area = np.pi*diameter**2/4)
-        self.sky = self.Sky_LU*self.factor_el*self.exposure_time  # el/pix/frame
+        self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area # but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+    #elec_pix = flux * throughput * atm * area /dispersio for image simulator
+
+
+        self.sky = self.Sky_LU*self.factor_LU2el*self.exposure_time  # el/pix/frame
         self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # ADU/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
             
@@ -220,7 +223,7 @@ class Observation:
 
         # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_LU)#ergs/cm2/s/arcsec^2 
         self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
-        self.Signal_el =  self.Signal_LU*self.factor_el*self.exposure_time * self.flux_fraction_slit  # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
     
         self.Signal_resolution = self.Signal_el *self.N_images_true* (self.resolution_element/self.pixel_size)**2# el/N exposure/resol
         self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
@@ -493,10 +496,11 @@ class Observation:
         threshold = interpn(coords, table_threshold, point,bounds_error=False,fill_value=None)
         snr_ratio = interpn(coords, table_snr, point,bounds_error=False,fill_value=None)
 
-        if self.smearing == 0:
-            a = Table.read("fraction_flux.csv")
-            threshold = 5.5
-            fraction_signal = np.interp(self.EM_gain/self.RN,a["G/RN"],a["fractionflux"])
+        if type(self.smearing)==float:
+            if self.smearing == 0:
+                a = Table.read("fraction_flux.csv")
+                threshold = 5.5
+                fraction_signal = np.interp(self.EM_gain/self.RN,a["G/RN"],a["fractionflux"])
             # fraction_rn = f(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
             # fraction_signal = f2(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
             # snr_ratio = f3(flux=0.1,EM_gain=self.EM_gain, RN=self.RN)
