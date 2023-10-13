@@ -155,7 +155,7 @@ class Observation:
             PSF_mask = PSF_RMS_mask if ((type(PSF_RMS_mask) is float)|(type(PSF_RMS_mask) is int)) else PSF_RMS_mask[i]
             PSF_det = PSF_RMS_det if ((type(PSF_RMS_det) is float)|(type(PSF_RMS_det) is int)) else PSF_RMS_det[i]
             psf_instr =  Gaussian1D.evaluate(np.arange(m),  1,  m/2, np.sqrt(PSF_mask**2+PSF_det**2))
-            self.Signal *= np.convolve(Gaussian1D.evaluate(np.arange(m),  1,  m/2, psf_source), psf_instr/psf_instr.sum(), mode="same").max()
+            self.Signal *= np.convolve(Gaussian1D.evaluate(np.arange(m),  1,  m/2, psf_source), psf_instr/psf_instr.sum(), mode="same").max() #>0.9
             self.PSF_loss_slit_function = np.poly1d([-0.1824,  1.2289]) #for 6" slit, 3" half size
             #Cut by the slit: computed by table in:
             # Fraction lost by the slit: https://articles.adsabs.harvard.edu//full/1961SvA.....4..841B/0000844.000.html
@@ -165,7 +165,7 @@ class Observation:
             self.flux_fraction_slit = 1
 
         
-        self.resolution_element= self.PSF_RMS_det * 2.35 * self.pixel_size #57#microns
+        self.resolution_element= self.PSF_RMS_det * 2.35 #* self.pixel_size #57#microns
         # elec_pix = flux * throughput * atm * detector * area /dispersion# should not be multiplied by exposure time here
 
         # self.colors= ['#E24A33','#348ABD','#FBC15E','#988ED5','#8EBA42','#FFB5B8','#777777']
@@ -217,25 +217,18 @@ class Observation:
         self.N_images = self.acquisition_time*3600/(self.exposure_time + self.readout_time)
         coeff_stack = 1 #TBC, why was this set to 2
         self.N_images_true = self.N_images * coeff_stack * (1-self.cosmic_ray_loss)
-        self.Total_sky = self.N_images_true * self.sky
-        self.sky_resolution = self.Total_sky * (self.resolution_element/self.pixel_size)**2# el/N exposure/resol
-
-
+        # self.Total_sky = self.N_images_true * self.sky
+        # self.sky_resolution = self.Total_sky * self.resolution_element**2# el/N exposure/resol
         # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_LU)#ergs/cm2/s/arcsec^2 
         self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
         self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
     
-        self.Signal_resolution = self.Signal_el *self.N_images_true* (self.resolution_element/self.pixel_size)**2# el/N exposure/resol
-        self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
+        self.Signal_resolution = self.Signal_el * self.N_images_true * self.resolution_element**2# el/N exposure/resol
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF )     #el / resol/ N frame
-        self.signal_noise_resol = self.signal_noise *self.resolution_element/self.pixel_size   # el/resol/frame
-        self.signal_noise_nframe = self.signal_noise_resol *np.sqrt(self.N_images_true)  # el/resol/frame
-        self.Total_noise_final = np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
-        self.factor = np.sqrt(self.N_images_true) * (self.resolution_element/self.pixel_size)
-        self.Total_noise_nframe = self.Total_noise_final * np.sqrt(self.N_images_true)
-        self.Total_noise_resol = self.Total_noise_nframe * (self.resolution_element/self.pixel_size)
-        self.SNR = self.Signal_resolution/self.Total_noise_resol
+        self.factor = np.sqrt(self.N_images_true) * self.resolution_element
+        self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
+        self.SNR = self.Signal_resolution / self.Total_noise_final
         if type(self.Total_noise_final + self.Signal_resolution) == np.float64:
             n=0
         else:
@@ -243,9 +236,6 @@ class Observation:
         if n>1:
             for name in ["signal_noise","Dark_current_noise", "Additional_background_noise","Sky_noise", "CIC_noise", "RN_final","Signal_resolution","Signal_el","sky","CIC_charge","Dark_current_f","RN","Additional_background"]:
                 setattr(self, name, getattr(self,name)*np.ones(n))
-        # self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Additional_background_noise*self.factor, self.Sky_noise*self.factor, self.CIC_noise*self.factor, self.RN_final*self.factor, self.Signal_resolution]).T
-        # self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.CIC_noise*self.factor, self.RN_final*self.factor, self.Signal_resolution]).T
-        # self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky, self.CIC_charge, self.RN_final]).T
         
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
         self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  self.RN_final, self.CIC_charge, self.Additional_background]).T
@@ -259,6 +249,7 @@ class Observation:
         self.el_per_pix = self.Signal_el + self.sky + self.CIC_charge +  self.Dark_current_f
         n_sigma = 5
         self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma**2 * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
+        self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
         self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (1.1*self.PSF_RMS_det)**2
