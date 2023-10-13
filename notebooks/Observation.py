@@ -123,7 +123,7 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 #TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky_LU=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky_LU=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16,lambda_stack=1):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -223,9 +223,10 @@ class Observation:
         self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
         self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
     
-        self.Signal_resolution = self.Signal_el * self.N_images_true * self.resolution_element**2# el/N exposure/resol
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF )     #el / resol/ N frame
-        self.factor = np.sqrt(self.N_images_true) * self.resolution_element
+        # self.N_resol_element_A = self.lambda_stack / (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
+        self.factor = np.sqrt(self.N_images_true) * self.resolution_element #* np.sqrt(self.N_resol_element_A)
+        self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
         self.SNR = self.Signal_resolution / self.Total_noise_final
