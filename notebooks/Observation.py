@@ -52,19 +52,19 @@ def rgetattr(obj, attr, *args):
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
-def convert_LU2ergs(LU,wave_nm):
+def convert_LU2ergs(LU,wave_nm,pixel_size_arcsec):
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
-    angle = np.pi / (180 * 3600)
+    angle = pixel_size_arcsec * np.pi / (180 * 3600)
     flux_ergs = LU * Energy * angle * angle
     return flux_ergs
 
-def convert_ergs2LU(flux_ergs,wave_nm):
+def convert_ergs2LU(flux_ergs,wave_nm,pixel_size_arcsec):
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
-    angle = np.pi / (180 * 3600)
+    angle =  pixel_size_arcsec * np.pi / (180 * 3600)
     # flux_ergs = LU * Energy * angle * angle
-    LU = flux_ergs/ (Energy * angle * angle)
+    LU = flux_ergs/ (Energy  * angle * angle)
     return LU
 
 def initializer(func):
@@ -123,7 +123,7 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 #TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky_LU=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16,lambda_stack=1):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -173,9 +173,8 @@ class Observation:
         self.colors= ['#E24A33','#348ABD','#988ED5','#8EBA42','#FBC15E','#FFB5B8','#777777']
         # self.colors= ['#E24A33','#FFB5B8','#FBC15E','#8EBA42','#348ABD','#988ED5','#777777']
         # self.lu2ergs = 2.33E-19/1000        
-        # self.Sky_LU =  convert_ergs2LU(self.Sky_,self.wavelength)
-        self.Sky_ = convert_LU2ergs(self.Sky_LU, self.wavelength) 
-        # self.Sky_ = self.Sky_LU*self.lu2ergs# ergs/cm2/s/arcsec^2 
+        # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength,self.pixel_scale)
+        # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
         self.ENF = 1 if self.counting_mode else 2 # Excess Noise Factor 
         self.CIC_noise = np.sqrt(CIC_charge * self.ENF) 
@@ -183,11 +182,14 @@ class Observation:
         self.Dark_current_noise =  np.sqrt(self.Dark_current_f * self.ENF)
         
         #for now we put the regular QE without taking into account the photon kept fracton, because then infinite loop. Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
+        self.pixel_size_arcsec = self.pixel_scale
         self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
+        self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
+        self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
         self.area *= 100 * 100#m2 to cm2
         if counting_mode:
             self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.area # (self.area = np.pi*diameter**2/4)
-            self.sky = self.Sky_LU*self.factor_LU2el*self.exposure_time  # el/pix/frame
+            self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
             self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
@@ -198,12 +200,16 @@ class Observation:
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
+        if np.isnan(self.Slitwidth):
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+        else:
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area  * self.Slitwidth  / self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+        
 
-        self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area # but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
     #elec_pix = flux * throughput * atm * area /dispersio for image simulator
 
 
-        self.sky = self.Sky_LU*self.factor_LU2el*self.exposure_time  # el/pix/frame
+        self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
         self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # ADU/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
             
@@ -219,10 +225,14 @@ class Observation:
         self.N_images_true = self.N_images * coeff_stack * (1-self.cosmic_ray_loss)
         # self.Total_sky = self.N_images_true * self.sky
         # self.sky_resolution = self.Total_sky * self.resolution_element**2# el/N exposure/resol
-        # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_LU)#ergs/cm2/s/arcsec^2 
-        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
-        self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
-    
+        # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_CU)#ergs/cm2/s/arcsec^2 
+        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength,self.pixel_size_arcsec)
+        if 1==0: # if line is totally resolved (for cosmic web for instance)
+            self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        else: # if line is unresolved for QSO for instance
+            self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+
+
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF )     #el / resol/ N frame
         # self.N_resol_element_A = self.lambda_stack / (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
         self.factor = np.sqrt(self.N_images_true) * self.resolution_element #* np.sqrt(self.N_resol_element_A)
@@ -252,7 +262,7 @@ class Observation:
         self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma**2 * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
         self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
         self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu
-        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
+        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength,self.pixel_size_arcsec) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (1.1*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
 
@@ -261,7 +271,7 @@ class Observation:
     def PlotNoise(self,title='',x='exposure_time', lw=8):
         """
         Generate a plot of the evolution of the noise budget with one parameter:
-        exposure_time, Sky_LU, acquisition_time, Signal, EM_gain, RN, CIC_charge, Dard_current, readout_time, smearing, temperature, PSF_RMS_det, PSF_RMS_mask, QE, extra_background, cosmic_ray_loss_per_sec
+        exposure_time, Sky_CU, acquisition_time, Signal, EM_gain, RN, CIC_charge, Dard_current, readout_time, smearing, temperature, PSF_RMS_det, PSF_RMS_mask, QE, extra_background, cosmic_ray_loss_per_sec
         """
         fig, axes= plt.subplots(4, 1, figsize=(12, 8), sharex=True) # fig, (ax1, ax2,ax3) = plt.subplots(3, 1, figsize=(12, 7), sharex=True) #figsize=(9, 5.5)
         ax1, ax2,ax3, ax4  = axes
