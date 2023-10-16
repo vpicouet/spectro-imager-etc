@@ -280,7 +280,7 @@ class Observation:
         ax2.set_ylabel('e-/pix/frame')
         ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%(np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
         ax2.set_xlim((getattr(self,x).min(),getattr(self,x).max()))
-
+        ax2.axhline(0.1,ls=":",color="k")
         # ax3
         ax3.grid(False)
         self.stackplot2 = ax3.stackplot(getattr(self,x), self.snrs * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
