@@ -17,6 +17,8 @@ from functools import wraps
 import inspect
 from scipy.sparse import dia_matrix
 from scipy.interpolate import interpn
+from scipy.special import erf
+
 # plt.style.use('dark_background')
 # fmt = mticker.FuncFormatter(lambda x, pos: "${}$".format(mticker.ScalarFormatter(useOffset=False, useMathText=True)._formatSciNotation("%1.10e" % np.round(x, 5))))
 
@@ -37,8 +39,10 @@ np.seterr(invalid='ignore')
 # import warnings
 # warnings.filterwarnings("ignore")
 def float_to_latex(mumber):
-    return "$\,"+ ("%.1E"%(mumber)).replace("E"," \,10^{")+"}$"
-    
+    try:
+        return "$\,"+ ("%.1E"%(mumber)).replace("E"," \,10^{")+"}$"
+    except TypeError as e:
+        print(e,mumber)
     # return ("%.1E"%(mumber)).replace("E"," 10$^{")+"}$"
 
 def rsetattr(obj, attr, val):
@@ -123,13 +127,13 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 #TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,psf_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
 
-        for key in ["wavelength", "dispersion", "pixel_size","area","pixel_scale"]:#instrument.keys():
+        for key in ["wavelength", "dispersion", "pixel_size","pixel_scale"]:#instrument.keys():
             # print( key,float(instruments[instrument][instruments["Charact."]==key][0]))
             setattr(self, key,float(instruments[instrument][instruments["Charact."]==key][0]))
 
@@ -149,30 +153,36 @@ class Observation:
             # if it is around the FWHM then the flux is lowered by <7
             # there fore the e-/pix value will be the max value.
             self.Signal = 10**(-(Signal-20.08)/2.5)*2.06*1E-16
-        # if instrument==FIREBall:
-        if "FIREBall" in instrument:
-            m=40
-            PSF_mask = PSF_RMS_mask if ((type(PSF_RMS_mask) is float)|(type(PSF_RMS_mask) is int)) else PSF_RMS_mask[i]
-            PSF_det = PSF_RMS_det if ((type(PSF_RMS_det) is float)|(type(PSF_RMS_det) is int)) else PSF_RMS_det[i]
-            psf_instr =  Gaussian1D.evaluate(np.arange(m),  1,  m/2, np.sqrt(PSF_mask**2+PSF_det**2))
-            self.Signal *= np.convolve(Gaussian1D.evaluate(np.arange(m),  1,  m/2, psf_source), psf_instr/psf_instr.sum(), mode="same").max() #>0.9
-            self.PSF_loss_slit_function = np.poly1d([-0.1824,  1.2289]) #for 6" slit, 3" half size
+        
+        # if "FIREBall" in instrument:
+        #     # goal is to assess flux fraction going through slit
+        #     # and to 
+        #     m=40
+        #     self.PSF_mask = self.PSF_RMS_mask if ((type(self.PSF_RMS_mask) is float)|(type(self.PSF_RMS_mask) is int)) else self.PSF_RMS_mask[i]
+        #     self.PSF_det = self.PSF_RMS_det if ((type(self.PSF_RMS_det) is float)|(type(self.PSF_RMS_det) is int)) else self.PSF_RMS_det[i]
+        #     self.psf_instr =  Gaussian1D.evaluate(np.arange(m),  1,  m/2, np.sqrt(self.PSF_mask**2+self.PSF_det**2))
+        #     self.Signal *= np.convolve(Gaussian1D.evaluate(np.arange(m),  1,  m/2, self.PSF_source), self.psf_instr/self.psf_instr.sum(), mode="same").max() #>0.9
+            # self.PSF_loss_slit_function = np.poly1d([-0.1824,  1.2289]) #for 6" slit, 3" half size
             #Cut by the slit: computed by table in:
             # Fraction lost by the slit: https://articles.adsabs.harvard.edu//full/1961SvA.....4..841B/0000844.000.html
             # S=3'' in our case, with sigma_mask  1.27 , then wer fit: #plt.plot([0.1,0.2,0.4,0.7,1,1.5,2,2.5,3],[1.000,1.000,1.000,1.000,0.997,0.955,0.866,0.770,0.683],"o")
-            self.flux_fraction_slit = np.minimum(1,self.PSF_loss_slit_function(self.PSF_RMS_mask))
+            # self.flux_fraction_slit = np.minimum(1,self.PSF_loss_slit_function(self.PSF_RMS_mask))
+        #convolve input flux by instrument PSF
+        self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
+
+        if ~np.isnan(self.Slitwidth):
+            # assess flux fraction going through slit
+            self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
             self.flux_fraction_slit = 1
 
         
         self.resolution_element= self.PSF_RMS_det * 2.35 #* self.pixel_size #57#microns
-        # elec_pix = flux * throughput * atm * detector * area /dispersion# should not be multiplied by exposure time here
 
         # self.colors= ['#E24A33','#348ABD','#FBC15E','#988ED5','#8EBA42','#FFB5B8','#777777']
         # self.colors= ['#E24A33','#FBC15E','#348ABD','#988ED5','#8EBA42','#FFB5B8','#777777']
         self.colors= ['#E24A33','#348ABD','#988ED5','#8EBA42','#FBC15E','#FFB5B8','#777777']
         # self.colors= ['#E24A33','#FFB5B8','#FBC15E','#8EBA42','#348ABD','#988ED5','#777777']
-        # self.lu2ergs = 2.33E-19/1000        
         # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength,self.pixel_scale)
         # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
@@ -186,9 +196,9 @@ class Observation:
         self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
         self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
         self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
-        self.area *= 100 * 100#m2 to cm2
+        self.Collecting_area *= 100 * 100#m2 to cm2
         if counting_mode:
-            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.area # (self.area = np.pi*diameter**2/4)
+            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.Collecting_area # (self.Collecting_area = np.pi*diameter**2/4)
             self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
             self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
@@ -201,12 +211,12 @@ class Observation:
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
         if np.isnan(self.Slitwidth):
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.area  * self.Slitwidth  / self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area  * self.Slitwidth  * self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
         
 
-    #elec_pix = flux * throughput * atm * area /dispersio for image simulator
+    #elec_pix = flux * throughput * atm * Collecting_area /dispersio for image simulator
 
 
         self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
@@ -234,8 +244,9 @@ class Observation:
 
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF )     #el / resol/ N frame
-        # self.N_resol_element_A = self.lambda_stack / (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
-        self.factor = np.sqrt(self.N_images_true) * self.resolution_element #* np.sqrt(self.N_resol_element_A)
+
+        self.N_resol_element_A = self.lambda_stack / self.dispersion#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
+        self.factor = np.sqrt(self.N_images_true) * self.resolution_element * np.sqrt(self.N_resol_element_A)
         self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
