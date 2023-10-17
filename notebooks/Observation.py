@@ -29,7 +29,7 @@ sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 instruments = Table.from_pandas(pd.read_csv(url))
-instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
+instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[3:]}
 
 
 
@@ -104,10 +104,10 @@ def initializer(func):
 n=10
 type_="" #"new_" #""
 #new is for when we don't use fraction and use RN (false I think), "" is with fraction true positives and RN/gain, seems better 
-table_threshold = fits.open("%sthreshold_%s.fits"%(type_,n))[0].data
-table_snr = fits.open("%ssnr_max_%s.fits"%(type_,n))[0].data
-table_fraction_rn = fits.open("%sfraction_rn_%s.fits"%(type_,n))[0].data
-table_fraction_flux = fits.open("%sfraction_flux_%s.fits"%(type_,n))[0].data
+table_threshold = fits.open("interpolate/%sthreshold_%s.fits"%(type_,n))[0].data
+table_snr = fits.open("interpolate/%ssnr_max_%s.fits"%(type_,n))[0].data
+table_fraction_rn = fits.open("interpolate/%sfraction_rn_%s.fits"%(type_,n))[0].data
+table_fraction_flux = fits.open("interpolate/%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
