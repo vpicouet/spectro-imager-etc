@@ -18,6 +18,7 @@ import inspect
 from scipy.sparse import dia_matrix
 from scipy.interpolate import interpn
 from scipy.special import erf
+from astropy.modeling.functional_models import Gaussian2D
 
 # plt.style.use('dark_background')
 # fmt = mticker.FuncFormatter(lambda x, pos: "${}$".format(mticker.ScalarFormatter(useOffset=False, useMathText=True)._formatSciNotation("%1.10e" % np.round(x, 5))))
@@ -127,15 +128,15 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 #TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
 
-        for key in ["wavelength", "dispersion", "pixel_size","pixel_scale"]:#instrument.keys():
-            # print( key,float(instruments[instrument][instruments["Charact."]==key][0]))
-            setattr(self, key,float(instruments[instrument][instruments["Charact."]==key][0]))
+        # for key in ["wavelength", "dispersion", "pixel_size","pixel_scale"]:#instrument.keys():
+        #     # print( key,float(instruments[instrument][instruments["Charact."]==key][0]))
+        #     setattr(self, key,float(instruments[instrument][instruments["Charact."]==key][0]))
 
             # if hasattr(self, key):
                 # locals_[key] = instruments[instrument][key]
@@ -145,7 +146,10 @@ class Observation:
                 # print(instrument + "\n" != open('/tmp/instrument.txt', 'r').read())
             # if key=="EM_gain":
 
-
+        # self.Signal = Gaussian2D
+        # print(self.Signal)
+        self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
+        # print(self.Δx,self.Δλ,Δx,Δλ,self.PSF_source,self.Signal)
         if np.max([self.Signal])>1:
             # actually here we should ask the size of the source
             # if the source extension is >> FWHM insturment, then flux is this
