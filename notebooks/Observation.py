@@ -148,8 +148,11 @@ class Observation:
 
         # self.Signal = Gaussian2D
         # print(self.Signal)
+        # print("Sig=",self.Signal)
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
-        # print(self.Δx,self.Δλ,Δx,Δλ,self.PSF_source,self.Signal)
+        # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\nsmearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
+        # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
+        
         if np.max([self.Signal])>1:
             # actually here we should ask the size of the source
             # if the source extension is >> FWHM insturment, then flux is this
@@ -179,6 +182,7 @@ class Observation:
             self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
             self.flux_fraction_slit = 1
+        # print(self.Δx,self.Δλ,Δx,Δλ,self.PSF_source,self.Signal)
 
         
         self.resolution_element= self.PSF_RMS_det * 2.35 #* self.pixel_size #57#microns
