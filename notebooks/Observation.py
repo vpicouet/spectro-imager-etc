@@ -19,7 +19,7 @@ from scipy.sparse import dia_matrix
 from scipy.interpolate import interpn
 from scipy.special import erf
 from astropy.modeling.functional_models import Gaussian2D
-
+ 
 # plt.style.use('dark_background')
 # fmt = mticker.FuncFormatter(lambda x, pos: "${}$".format(mticker.ScalarFormatter(useOffset=False, useMathText=True)._formatSciNotation("%1.10e" % np.round(x, 5))))
 
@@ -29,7 +29,11 @@ import pandas as pd
 sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-instruments = Table.from_pandas(pd.read_csv(url))
+try:
+    instruments = Table.from_pandas(pd.read_csv(url))
+except Exception:
+    instruments = Table.read("Instruments.csv")
+instruments = instruments[instruments.colnames]
 instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[3:]}
 
 
