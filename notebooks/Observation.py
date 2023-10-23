@@ -208,9 +208,9 @@ class Observation:
         self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
         self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
         self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
-        self.Collecting_area *= 100 * 100#m2 to cm2
+        # self.Collecting_area *= 100 * 100#m2 to cm2
         if counting_mode:
-            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * self.Collecting_area # (self.Collecting_area = np.pi*diameter**2/4)
+            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * (self.Collecting_area * 100 * 100) # (self.Collecting_area = np.pi*diameter**2/4)
             self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
             self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
@@ -223,9 +223,9 @@ class Observation:
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
         if np.isnan(self.Slitwidth).all():
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *    (self.Collecting_area * 100 * 100)   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area  * self.Slitwidth  * self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *    (self.Collecting_area * 100 * 100)  * self.Slitwidth  * self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
         
 
     #elec_pix = flux * throughput * atm * Collecting_area /dispersio for image simulator
