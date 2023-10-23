@@ -181,7 +181,7 @@ class Observation:
         #convolve input flux by instrument PSF
         self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
 
-        if ~np.isnan(self.Slitwidth):
+        if ~np.isnan(self.Slitwidth).all():
             # assess flux fraction going through slit
             self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
@@ -222,7 +222,7 @@ class Observation:
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
-        if np.isnan(self.Slitwidth):
+        if np.isnan(self.Slitwidth).all():
             self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
             self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *   self.Collecting_area  * self.Slitwidth  * self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
