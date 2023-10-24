@@ -1,7 +1,6 @@
 from astropy.table import Table
 import warnings
 warnings.filterwarnings("ignore")
-
 from ipywidgets import Button, Layout, jslink, IntText, IntSlider, interactive, interact, HBox, Layout, VBox
 from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
 import os
@@ -19,13 +18,11 @@ from scipy.sparse import dia_matrix
 from scipy.interpolate import interpn
 from scipy.special import erf
 from astropy.modeling.functional_models import Gaussian2D
- 
-# plt.style.use('dark_background')
-# fmt = mticker.FuncFormatter(lambda x, pos: "${}$".format(mticker.ScalarFormatter(useOffset=False, useMathText=True)._formatSciNotation("%1.10e" % np.round(x, 5))))
-
-
-
 import pandas as pd
+import functools
+np.seterr(invalid='ignore')
+ 
+
 sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
@@ -38,11 +35,7 @@ instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charac
 
 
 
-import functools
-np.seterr(invalid='ignore')
 
-# import warnings
-# warnings.filterwarnings("ignore")
 def float_to_latex(mumber):
     try:
         return "$\,"+ ("%.1E"%(mumber)).replace("E"," \,10^{")+"}$"
@@ -128,8 +121,6 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
     return smearing_kernels   
 
 
-
-#TODO should we add the detector plate scale and dispersion ? and resolution spectrale?
 class Observation:
     @initializer
     def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan):#,photon_kept=0.7#, flight_background_damping = 0.9
@@ -138,50 +129,16 @@ class Observation:
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
 
-        # for key in ["wavelength", "dispersion", "pixel_size","pixel_scale"]:#instrument.keys():
-        #     # print( key,float(instruments[instrument][instruments["Charact."]==key][0]))
-        #     setattr(self, key,float(instruments[instrument][instruments["Charact."]==key][0]))
-
-            # if hasattr(self, key):
-                # locals_[key] = instruments[instrument][key]
-                # locals()[key] = instruments[instrument][key]
-                # globals()[key] = instruments[instrument][key]
-                # print(key, getattr(self, key))
-                # print(instrument + "\n" != open('/tmp/instrument.txt', 'r').read())
-            # if key=="EM_gain":
-
-        # self.Signal = Gaussian2D
-        # print(self.Signal)
-        # print("Sig=",self.Signal)
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
         # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\nsmearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
         
+        # Simple hack to me able to use UV magnitudes (not used for the ETC)
         if np.max([self.Signal])>1:
-            # actually here we should ask the size of the source
-            # if the source extension is >> FWHM insturment, then flux is this
-            # if compact or << FWHM then Flux must be divided by the PSF profile (~7)
-            # if it is around the FWHM then the flux is lowered by <7
-            # there fore the e-/pix value will be the max value.
             self.Signal = 10**(-(Signal-20.08)/2.5)*2.06*1E-16
-        
-        # if "FIREBall" in instrument:
-        #     # goal is to assess flux fraction going through slit
-        #     # and to 
-        #     m=40
-        #     self.PSF_mask = self.PSF_RMS_mask if ((type(self.PSF_RMS_mask) is float)|(type(self.PSF_RMS_mask) is int)) else self.PSF_RMS_mask[i]
-        #     self.PSF_det = self.PSF_RMS_det if ((type(self.PSF_RMS_det) is float)|(type(self.PSF_RMS_det) is int)) else self.PSF_RMS_det[i]
-        #     self.psf_instr =  Gaussian1D.evaluate(np.arange(m),  1,  m/2, np.sqrt(self.PSF_mask**2+self.PSF_det**2))
-        #     self.Signal *= np.convolve(Gaussian1D.evaluate(np.arange(m),  1,  m/2, self.PSF_source), self.psf_instr/self.psf_instr.sum(), mode="same").max() #>0.9
-            # self.PSF_loss_slit_function = np.poly1d([-0.1824,  1.2289]) #for 6" slit, 3" half size
-            #Cut by the slit: computed by table in:
-            # Fraction lost by the slit: https://articles.adsabs.harvard.edu//full/1961SvA.....4..841B/0000844.000.html
-            # S=3'' in our case, with sigma_mask  1.27 , then wer fit: #plt.plot([0.1,0.2,0.4,0.7,1,1.5,2,2.5,3],[1.000,1.000,1.000,1.000,0.997,0.955,0.866,0.770,0.683],"o")
-            # self.flux_fraction_slit = np.minimum(1,self.PSF_loss_slit_function(self.PSF_RMS_mask))
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
         self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
-
         #convolve input flux by spectral resolution
         # self.spectro_resolution_A = self.wavelength * self.spectral
         self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
@@ -192,16 +149,14 @@ class Observation:
             self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
             self.flux_fraction_slit = 1
-        # print(self.Δx,self.Δλ,Δx,Δλ,self.PSF_source,self.Signal)
-
         
-        self.resolution_element= self.PSF_RMS_det * 2.35 #* self.pixel_size #57#microns
+        self.resolution_element= self.PSF_RMS_det * 2.35 # in arcseconds
 
 
-        rouge, bleu, violet, jaune, vert, rose, gris  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
-        self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
-        self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777']
-        self.colors= [rouge, violet, jaune  ,bleu, vert, rose, gris ]
+        red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
+        # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
+        # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777']
+        self.colors= [red, violet, yellow  ,blue, green, pink, grey ]
         # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength,self.pixel_scale)
         # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
@@ -210,60 +165,54 @@ class Observation:
         self.Dark_current_f = self.Dard_current * self.exposure_time / 3600 # e/pix/frame
         self.Dark_current_noise =  np.sqrt(self.Dark_current_f * self.ENF)
         
-        #for now we put the regular QE without taking into account the photon kept fracton, because then infinite loop. Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
+        # For now we put the regular QE without taking into account the photon kept fracton, because then infinite loop. 
+        # Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
         self.pixel_size_arcsec = self.pixel_scale
         # self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
         self.arcsec2str = (np.pi/180/3600)**2
         self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
-        self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
+        # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
-        if counting_mode:
-            self.factor_LU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
-            self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
-            # self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
+        # TODO use astropy.unit
+        if self.counting_mode:
+            self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
+            self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
-            # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
         else:
-            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(50),np.ones(50),np.ones(50), np.zeros(50) #0,1,1, 0
-            # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
+            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(50),np.ones(50),np.ones(50), np.zeros(50)
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
-        #TODO verify that indeed it should not depend on self.pixel_scale**2 
+        # TODO verify that indeed it should not depend on self.pixel_scale**2 
+        # Compute ratio to convert CU to el/pix 
         if np.isnan(self.Slitwidth).all():
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str# *self.pixel_scale**2 but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            # If instrument is not a spectro?
+            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str# *self.pixel_scale**2 but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion  #*self.pixel_scale**2  but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion  #*self.pixel_scale**2  but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
         
 
-    #elec_pix = flux * throughput * atm * Collecting_area /dispersio for image simulator
-
-
-        self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
-        # self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # ADU/pix/frame
+        self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
             
-
-        self.RN_final = self.RN  * self.RN_fraction_kept / self.EM_gain #Are we sure about that? 
-        # print(self.RN,  self.RN_fraction_kept , self.EM_gain)
-        self.Additional_background = extra_background/3600 * self.exposure_time# e/pix/f
+        # TODO in counting mode, Photon_fraction_kept should also be used for CIC
+        self.RN_final = self.RN  * self.RN_fraction_kept / self.EM_gain 
+        self.Additional_background = extra_background/3600 * self.exposure_time# e/pix/exp
         self.Additional_background_noise = np.sqrt(self.Additional_background * self.ENF)
         
         # number of images taken during one field acquisition (~2h)
         self.N_images = self.acquisition_time*3600/(self.exposure_time + self.readout_time)
         self.N_images_true = self.N_images * (1-self.cosmic_ray_loss)
-        # self.Total_sky = self.N_images_true * self.sky
-        # self.sky_resolution = self.Total_sky * self.resolution_element**2# el/N exposure/resol
-        # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_CU)#ergs/cm2/s/arcsec^2 
+
         self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength,self.pixel_size_arcsec)
-        if 1==0: # if line is totally resolved (for cosmic web for instance)
-            self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
-        else: # if line is unresolved for QSO for instance
-            self.Signal_el =  self.Signal_LU*self.factor_LU2el*self.exposure_time * self.flux_fraction_slit   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        # if 1==0: # if line is totally resolved (for cosmic web for instance)
+        #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        # else: # if line is unresolved for QSO for instance
+        self.Signal_el =  self.Signal_LU * self.factor_CU2el * self.exposure_time * self.flux_fraction_slit   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
 
 
-        self.signal_noise = np.sqrt(self.Signal_el * self.ENF )     #el / resol/ N frame
+        self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
         self.N_resol_element_A = self.lambda_stack / self.dispersion#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
         self.factor = np.sqrt(self.N_images_true) * self.resolution_element * np.sqrt(self.N_resol_element_A)
@@ -282,12 +231,13 @@ class Observation:
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
         self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  self.RN_final, self.CIC_charge, self.Additional_background]).T
         self.names = ["Signal","Dark current", "Sky", "Read noise","CIC", "Extra background"]
-        
         self.snrs=self.Signal_resolution /self.Total_noise_final
+
         if np.ndim(self.noises)==2:
             self.percents =  100* np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2
         else:
             self.percents =  100* np.array(self.noises).T[:-1]**2/self.Total_noise_final**2            
+        
         self.el_per_pix = self.Signal_el + self.sky + self.CIC_charge +  self.Dark_current_f
         n_sigma = 5
         self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma**2 * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
@@ -352,9 +302,6 @@ class Observation:
         ax1.tick_params(labelright=True,right=True)
         ax2.tick_params(labelright=True,right=True)
         ax3.tick_params(labelright=True,right=True)
-        # ax1.set_title('$t_{aqu}$:%0.1fh,G$_{EM}$:%i, Counting:%s - SNR$_{MAX}$=%0.1f'%(new.acquisition_time,new.EM_gain,new.counting_mode,np.max(new.SNR)),y=1)
-        # fig.suptitle('pompo,')
-        # ax1.set_title(title+'Flux:%s, $t_{aqu}$:%0.1fh, G$_{EM}$:%i, Counting:%s'%(self.Signal,self.acquisition_time,self.EM_gain,self.counting_mode))
         fig.tight_layout(h_pad=0.01)
         return fig 
 
