@@ -178,8 +178,14 @@ class Observation:
             # Fraction lost by the slit: https://articles.adsabs.harvard.edu//full/1961SvA.....4..841B/0000844.000.html
             # S=3'' in our case, with sigma_mask  1.27 , then wer fit: #plt.plot([0.1,0.2,0.4,0.7,1,1.5,2,2.5,3],[1.000,1.000,1.000,1.000,0.997,0.955,0.866,0.770,0.683],"o")
             # self.flux_fraction_slit = np.minimum(1,self.PSF_loss_slit_function(self.PSF_RMS_mask))
+        #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
         self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
+
+        #convolve input flux by spectral resolution
+        # self.spectro_resolution_A = self.wavelength * self.spectral
+        self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
+
 
         if ~np.isnan(self.Slitwidth).all():
             # assess flux fraction going through slit
@@ -191,10 +197,11 @@ class Observation:
         
         self.resolution_element= self.PSF_RMS_det * 2.35 #* self.pixel_size #57#microns
 
-        # self.colors= ['#E24A33','#348ABD','#FBC15E','#988ED5','#8EBA42','#FFB5B8','#777777']
-        # self.colors= ['#E24A33','#FBC15E','#348ABD','#988ED5','#8EBA42','#FFB5B8','#777777']
-        self.colors= ['#E24A33','#348ABD','#988ED5','#8EBA42','#FBC15E','#FFB5B8','#777777']
-        # self.colors= ['#E24A33','#FFB5B8','#FBC15E','#8EBA42','#348ABD','#988ED5','#777777']
+
+        rouge, bleu, violet, jaune, vert, rose, gris  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
+        self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
+        self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777']
+        self.colors= [rouge, violet, jaune  ,bleu, vert, rose, gris ]
         # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength,self.pixel_scale)
         # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
@@ -205,14 +212,15 @@ class Observation:
         
         #for now we put the regular QE without taking into account the photon kept fracton, because then infinite loop. Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
         self.pixel_size_arcsec = self.pixel_scale
-        self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
+        # self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
+        self.arcsec2str = (np.pi/180/3600)**2
         self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
         self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
         if counting_mode:
-            self.factor_LU2el = self.QE * self.Throughput * self.Atmosphere * self.pixel_scale**2 * (self.Collecting_area * 100 * 100) # (self.Collecting_area = np.pi*diameter**2/4)
+            self.factor_LU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
             self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
-            self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
+            # self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i) #photon_kept
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
@@ -222,17 +230,18 @@ class Observation:
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
+        #TODO verify that indeed it should not depend on self.pixel_scale**2 
         if np.isnan(self.Slitwidth).all():
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *    (self.Collecting_area * 100 * 100)   * self.Bandwidth# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str# *self.pixel_scale**2 but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
-            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere*self.pixel_scale**2   *    (self.Collecting_area * 100 * 100)  * self.Slitwidth  * self.dispersion# but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+            self.factor_LU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion  #*self.pixel_scale**2  but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
         
 
     #elec_pix = flux * throughput * atm * Collecting_area /dispersio for image simulator
 
 
         self.sky = self.Sky_CU*self.factor_LU2el*self.exposure_time  # el/pix/frame
-        self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # ADU/pix/frame
+        # self.Sky_f =  self.sky * self.EM_gain #* Gain_ADU  # ADU/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
             
 
@@ -243,8 +252,7 @@ class Observation:
         
         # number of images taken during one field acquisition (~2h)
         self.N_images = self.acquisition_time*3600/(self.exposure_time + self.readout_time)
-        coeff_stack = 1 #TBC, why was this set to 2
-        self.N_images_true = self.N_images * coeff_stack * (1-self.cosmic_ray_loss)
+        self.N_images_true = self.N_images * (1-self.cosmic_ray_loss)
         # self.Total_sky = self.N_images_true * self.sky
         # self.sky_resolution = self.Total_sky * self.resolution_element**2# el/N exposure/resol
         # self.Signal_LU = self.Signal / self.lu2ergs# LU(self.Sky_/self.Sky_CU)#ergs/cm2/s/arcsec^2 
@@ -286,8 +294,9 @@ class Observation:
         self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
         self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength,self.pixel_size_arcsec) # self.signal_nsig_LU * self.lu2ergs
-        self.extended_source_5s = self.signal_nsig_ergs * (1.1*self.PSF_RMS_det)**2
+        self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
+        #TODO change this ratio of 1.30e57
 
        
 
@@ -313,7 +322,6 @@ class Observation:
         ax2.set_ylabel('e-/pix/frame')
         ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%(np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
         ax2.set_xlim((getattr(self,x).min(),getattr(self,x).max()))
-        ax2.axhline(0.1,ls=":",color="k")
         # ax3
         ax3.grid(False)
         self.stackplot2 = ax3.stackplot(getattr(self,x), self.snrs * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
