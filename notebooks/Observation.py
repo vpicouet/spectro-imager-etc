@@ -123,7 +123,7 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -180,7 +180,7 @@ class Observation:
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
         else:
-            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(50),np.ones(50),np.ones(50), np.zeros(50)
+            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(self.len_xaxis),np.ones(self.len_xaxis),np.ones(self.len_xaxis), np.zeros(self.len_xaxis)
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
@@ -247,6 +247,9 @@ class Observation:
         self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         #TODO change this ratio of 1.30e57
+        # from astropy.cosmology import Planck15 as cosmo
+        # 4*np.pi* (cosmo.luminosity_distance(z=0.7).to("cm").value)**2 = 2.30e57
+
 
        
 
@@ -264,7 +267,12 @@ class Observation:
             ax1.plot(getattr(self,x), self.noises[:,i],label='%s: %i (%0.1f%%)'%(name,self.noises[self.i,i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
         ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1),label='%s: %i (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1]),np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
         ax1.legend(loc='upper right')
-        ax1.set_ylabel('Noise (e-/res/N frames)')
+        ax1.set_ylabel('Noise (e-/pix/exp)')
+
+        # ax1b = ax1.secondary_yaxis("right", functions=( lambda x:  x * self.factor[self.i], lambda x:x / self.factor[self.i] ))
+        # self.ax1b = ax1b
+        # ax1b.set_ylabel("Noise (e-/res/N frames)")#r"%0.1f,%0.1f,%0.1f"%(self.factor[self.i],self.resolution_element , np.sqrt(self.N_resol_element_A)))
+
 
         # ax2 
         ax2.grid(False)
@@ -272,11 +280,25 @@ class Observation:
         ax2.set_ylabel('e-/pix/frame')
         ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%(np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
         ax2.set_xlim((getattr(self,x).min(),getattr(self,x).max()))
+
+
+        # ax2b = ax2.secondary_yaxis("right", functions=( lambda x:  x * self.factor[self.i]**2, lambda x:x / self.factor[self.i]**2 ))
+        # self.ax2b = ax2b
+        # ax2b.set_ylabel(r"%0.1f,%0.1f,%0.1f"%(self.factor[self.i],self.resolution_element , np.sqrt(self.N_resol_element_A)))
+
+
+
         # ax3
         ax3.grid(False)
         self.stackplot2 = ax3.stackplot(getattr(self,x), self.snrs * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
         ax3.set_ylim((0,np.nanmax(self.SNR)))
-        ax3.set_ylabel('SNR')        
+        ax3.set_ylabel('SNR (res, N frames)')        
+
+        # ax3b = ax3.secondary_yaxis("right", functions=( lambda x: x / self.factor[self.i]**2, lambda x: x * self.factor[self.i]**2))
+        # self.ax3b = ax3b
+        # ax3b.set_ylabel(r" SNR(res/N frames")
+
+
 
         # ax4
         ax4.plot(getattr(self,x), np.log10(self.extended_source_5s),"-",lw=lw-1,label="SNR=5 Flux/Pow on one elem resolution (%0.2f-%0.2f)"%(np.log10(self.point_source_5s[self.i]),np.nanmin(np.log10(self.point_source_5s))),c="k")
@@ -451,11 +473,11 @@ class Observation:
 
         noise_value = CIC_noise**2+dark_noise**2+Sky_noise**2
         
-        gains=np.linspace(800,2500,self.n)
-        rons=np.linspace(30,120,self.n)
-        fluxes=np.linspace(0.01,0.7,self.n)
-        smearings=np.linspace(0,2,self.n)
-        noise=np.linspace(0.002,0.05,self.n)
+        gains=np.linspace(800,2500,n)#self.len_xaxis)
+        rons=np.linspace(30,120,n)#self.len_xaxis)
+        fluxes=np.linspace(0.01,0.7,n)#self.len_xaxis)
+        smearings=np.linspace(0,2,n)#self.len_xaxis)
+        noise=np.linspace(0.002,0.05,n)#self.len_xaxis)
         if (n==6)|(n==10):
             coords = (gains, rons, fluxes, smearings)
             point = (Emgain, RN, flux, self.smearing)            
@@ -466,7 +488,7 @@ class Observation:
             print(n,Emgain, RN, flux, self.smearing,noise_value)
             
         if ~np.isscalar(noise_value) |  ~np.isscalar(self.smearing) | ~np.isscalar(Emgain) | ~np.isscalar(RN):
-            point = np.repeat(np.zeros((4,1)), 50, axis=1).T
+            point = np.repeat(np.zeros((4,1)), self.len_xaxis, axis=1).T
             point[:,0] =  self.EM_gain
             point[:,1] = self.RN
             point[:,2] = flux
