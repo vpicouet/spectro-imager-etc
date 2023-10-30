@@ -210,7 +210,7 @@ class Observation:
         #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
         # else: # if line is unresolved for QSO for instance
         self.Signal_el =  self.Signal_LU * self.factor_CU2el * self.exposure_time * self.flux_fraction_slit   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
-
+        # print(self.flux_fraction_slit)
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
@@ -220,6 +220,7 @@ class Observation:
         self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
         self.SNR = self.Signal_resolution / self.Total_noise_final
+        
         if type(self.Total_noise_final + self.Signal_resolution) == np.float64:
             n=0
         else:
@@ -227,7 +228,7 @@ class Observation:
         if n>1:
             for name in ["signal_noise","Dark_current_noise", "Additional_background_noise","Sky_noise", "CIC_noise", "RN_final","Signal_resolution","Signal_el","sky","CIC_charge","Dark_current_f","RN","Additional_background"]:
                 setattr(self, name, getattr(self,name)*np.ones(n))
-        
+        self.factor = self.factor*np.ones(n) if type(self.factor)== np.float64 else self.factor
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
         self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  self.RN_final, self.CIC_charge, self.Additional_background]).T
         self.names = ["Signal","Dark current", "Sky", "Read noise","CIC", "Extra background"]
@@ -264,8 +265,8 @@ class Observation:
 
         # ax1 
         for i,(name,c) in enumerate(zip(self.names,self.colors)):
-            ax1.plot(getattr(self,x), self.noises[:,i],label='%s: %i (%0.1f%%)'%(name,self.noises[self.i,i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
-        ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1),label='%s: %i (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1]),np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
+            ax1.plot(getattr(self,x), self.noises[:,i]/self.factor,label='%s: %i (%0.1f%%)'%(name,self.noises[self.i,i]/self.factor[self.i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
+        ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1)/self.factor,label='%s: %i (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1])/self.factor[self.i],np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
         ax1.legend(loc='upper right')
         ax1.set_ylabel('Noise (e-/pix/exp)')
 
