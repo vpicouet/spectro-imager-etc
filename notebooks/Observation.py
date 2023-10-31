@@ -214,7 +214,7 @@ class Observation:
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
-        self.N_resol_element_A = self.lambda_stack / self.dispersion#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
+        self.N_resol_element_A = self.lambda_stack / (1/self.dispersion)#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
         self.factor = np.sqrt(self.N_images_true) * self.resolution_element * np.sqrt(self.N_resol_element_A)
         self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
@@ -247,6 +247,15 @@ class Observation:
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength,self.pixel_size_arcsec) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
+        # print("factor=",self.factor[self.i])
+        # print("N_images_true=",np.sqrt(self.N_images_true)[self.i] )
+        # print("resolution_element=", self.resolution_element)
+        # print("N_resol_element_A=",np.sqrt(self.N_resol_element_A))
+        # print("lambda_stack=",self.lambda_stack)
+        # print("dispersion=",self.dispersion)
+        # print("cosmic_ray_loss=",np.sqrt(self.cosmic_ray_loss)[self.i])
+        # print("N_images=",np.sqrt(self.N_images)[self.i])
+
         #TODO change this ratio of 1.30e57
         # from astropy.cosmology import Planck15 as cosmo
         # 4*np.pi* (cosmo.luminosity_distance(z=0.7).to("cm").value)**2 = 2.30e57
@@ -265,8 +274,8 @@ class Observation:
 
         # ax1 
         for i,(name,c) in enumerate(zip(self.names,self.colors)):
-            ax1.plot(getattr(self,x), self.noises[:,i]/self.factor,label='%s: %i (%0.1f%%)'%(name,self.noises[self.i,i]/self.factor[self.i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
-        ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1)/self.factor,label='%s: %i (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1])/self.factor[self.i],np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
+            ax1.plot(getattr(self,x), self.noises[:,i]/self.factor,label='%s: %0.2f (%0.1f%%)'%(name,self.noises[self.i,i]/self.factor[self.i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
+        ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1)/self.factor,label='%s: %0.2f (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1])/self.factor[self.i],np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
         ax1.legend(loc='upper right')
         ax1.set_ylabel('Noise (e-/pix/exp)')
 
