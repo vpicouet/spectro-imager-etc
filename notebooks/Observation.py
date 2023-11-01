@@ -102,10 +102,12 @@ def initializer(func):
 n=10
 type_="" #"new_" #""
 #new is for when we don't use fraction and use RN (false I think), "" is with fraction true positives and RN/gain, seems better 
-table_threshold = fits.open("interpolate/%sthreshold_%s.fits"%(type_,n))[0].data
-table_snr = fits.open("interpolate/%ssnr_max_%s.fits"%(type_,n))[0].data
-table_fraction_rn = fits.open("interpolate/%sfraction_rn_%s.fits"%(type_,n))[0].data
-table_fraction_flux = fits.open("interpolate/%sfraction_flux_%s.fits"%(type_,n))[0].data
+path=""
+# path = "/Users/Vincent/Github/fireball2-etc/notebooks/"
+table_threshold = fits.open(path+"interpolate/%sthreshold_%s.fits"%(type_,n))[0].data
+table_snr = fits.open(path+"interpolate/%ssnr_max_%s.fits"%(type_,n))[0].data
+table_fraction_rn = fits.open(path+"interpolate/%sfraction_rn_%s.fits"%(type_,n))[0].data
+table_fraction_flux = fits.open(path+"interpolate/%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
@@ -123,7 +125,8 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 
 class Observation:
     @initializer
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=0,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
+    # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -198,7 +201,7 @@ class Observation:
             
         # TODO in counting mode, Photon_fraction_kept should also be used for CIC
         self.RN_final = self.RN  * self.RN_fraction_kept / self.EM_gain 
-        self.Additional_background = extra_background/3600 * self.exposure_time# e/pix/exp
+        self.Additional_background = self.extra_background/3600 * self.exposure_time# e/pix/exp
         self.Additional_background_noise = np.sqrt(self.Additional_background * self.ENF)
         
         # number of images taken during one field acquisition (~2h)
