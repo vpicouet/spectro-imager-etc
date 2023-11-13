@@ -153,7 +153,7 @@ class Observation:
         else:
             self.flux_fraction_slit = 1
         
-        self.resolution_element= self.PSF_RMS_det * 2.35 # in arcseconds
+        self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
 
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
@@ -181,7 +181,9 @@ class Observation:
             self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
             self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
-            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)
+            self.signal_pre_thresholding = self.Signal*self.factor_CU2el*self.exposure_time  # el/pix/frame
+            self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.interpolate_optimal_threshold(plot_=plot_, i=i)#,flux=self.signal_pre_thresholding)
+            # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i,flux=self.signal_pre_thresholding)
         else:
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(self.len_xaxis),np.ones(self.len_xaxis),np.ones(self.len_xaxis), np.zeros(self.len_xaxis)
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
@@ -217,7 +219,7 @@ class Observation:
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
-        self.N_resol_element_A = self.lambda_stack / (1/self.dispersion)#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
+        self.N_resol_element_A = self.lambda_stack / self.dispersion# / (1/self.dispersion)#/ (10*self.wavelength/self.Spectral_resolution) # should work even when no spectral resolution
         self.factor = np.sqrt(self.N_images_true) * self.resolution_element * np.sqrt(self.N_resol_element_A)
         self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
@@ -250,6 +252,7 @@ class Observation:
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength,self.pixel_size_arcsec) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
+        self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.snrs)
         # print("factor=",self.factor[self.i])
         # print("N_images_true=",np.sqrt(self.N_images_true)[self.i] )
         # print("resolution_element=", self.resolution_element)
