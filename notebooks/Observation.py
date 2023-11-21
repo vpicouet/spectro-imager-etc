@@ -112,12 +112,12 @@ table_fraction_flux = fits.open(path+"interpolate/%sfraction_flux_%s.fits"%(type
 
 
 
-def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
+def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
     """Creates variable smearing kernels for inversion
     """
     import numpy as np
     
-    smearing_length = Smearing * np.exp(-image / SmearExpDecrement)
+    smearing_length = smearing * np.exp(-image / SmearExpDecrement)
     smearing_kernels = np.exp(-np.arange(6)[:, np.newaxis, np.newaxis] / smearing_length)
     smearing_kernels /= smearing_kernels.sum(axis=0)
     return smearing_kernels   
@@ -126,14 +126,14 @@ def variable_smearing_kernels(image, Smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
 
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
-        # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\nsmearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
+        # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\n_smearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
         
         # Simple hack to me able to use UV magnitudes (not used for the ETC)
@@ -154,7 +154,7 @@ class Observation:
             self.flux_fraction_slit = 1
         
         self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
-
+        self.PSF_lambda_pix = self.wavelength / self.Spectral_resolution / self.dispersion
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
@@ -350,7 +350,7 @@ class Observation:
         Function is pretty slow so output of this function has been saved and can then directly be used with interpolation (see function interpolate_optimal_threshold)
         """
         #self.Signal_el if np.isscalar(self.Signal_el) else 0.3
-        Emgain = self.EM_gain if np.isscalar(self.EM_gain) else self.EM_gain[i]#1000
+        EM_gain = self.EM_gain if np.isscalar(self.EM_gain) else self.EM_gain[i]#1000
         RN = self.RN if np.isscalar(self.RN) else self.RN[i]#80
         CIC_noise = self.CIC_noise if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
         dark_noise = self.Dark_current_noise if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
@@ -363,10 +363,10 @@ class Observation:
         im = np.random.poisson(flux, size=size)
         values,bins = np.histogram(im,bins=[-0.5,0.5,1.5,2.5])
         ConversionGain=1#/4.5
-        imaADU = np.random.gamma(im, Emgain) *ConversionGain
+        imaADU = np.random.gamma(im, EM_gain) *ConversionGain
         bins = np.arange(np.min(imaADU)-5*RN*ConversionGain,np.max(imaADU)+5*RN*ConversionGain,25)
         # bins = np.linspace(-500,10000,400)
-        #imaADU = (np.random.gamma(im, Emgain) + np.random.normal(0, RN, size=size))*ConversionGain
+        #imaADU = (np.random.gamma(im, EM_gain) + np.random.normal(0, RN, size=size))*ConversionGain
         if plot_:
             if axes is None:
                 fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,figsize=(12, 7))#,figsize=(9,5))
@@ -403,8 +403,8 @@ class Observation:
 
         b = (bins[:-1]+bins[1:])/2
         rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
-        rn_noise = (RN/(Emgain * ConversionGain)) * rn_frac #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
-        # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(Emgain*ConversionGain)#/(Emgain*ConversionGain)
+        rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+        # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
         signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
         signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
 
@@ -419,7 +419,7 @@ class Observation:
         # print('noises = ',noise)
         SNR1 = pc*signal1/np.sqrt(signal1+noise)#+np.array(rn_noise)**2
         SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
-        SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(Emgain * ConversionGain))**2)
+        SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
         # print('SNR_analogic = ',SNR_analogic)
         threshold_55 = 5.5*RN*ConversionGain
         id_55 =  np.argmin(abs(threshold_55 - b))
@@ -436,7 +436,7 @@ class Observation:
         if plot_:
             ax2.plot(b,signal1/flux,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux),lw=lw)
             ax2.plot(b,rn_frac,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw)
-            # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EMGAIN)**2',lw=lw)
+            # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
             ax2.plot(b,pc,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t]),lw=lw)
             #ax2.plot(b,SNR1/pc,label='SNR without fraction')
 
@@ -463,7 +463,7 @@ class Observation:
             ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k')
             ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
 
-            ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, Smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(Emgain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
+            ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(EM_gain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
             ax1.set_xlim(xmin=bins.min(),xmax=7000)#bins.max())
             if axes is None:
                 fig.tight_layout()
@@ -477,7 +477,7 @@ class Observation:
         Return the threshold optimizing the SNR
         """
         #self.Signal_el if np.isscalar(self.Signal_el) else 0.3
-        Emgain = self.EM_gain #if np.isscalar(self.EM_gain) else self.EM_gain[i]
+        EM_gain = self.EM_gain #if np.isscalar(self.EM_gain) else self.EM_gain[i]
         RN= self.RN #if np.isscalar(self.RN) else self.RN[i]#80
         CIC_noise = self.CIC_noise #if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
         dark_noise = self.Dark_current_noise #if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
@@ -496,14 +496,14 @@ class Observation:
         noise=np.linspace(0.002,0.05,n)#self.len_xaxis)
         if (n==6)|(n==10):
             coords = (gains, rons, fluxes, smearings)
-            point = (Emgain, RN, flux, self.smearing)            
+            point = (EM_gain, RN, flux, self.smearing)            
         elif n==5:
             coords = (gains, rons, fluxes, smearings,noise)
-            point = (Emgain, RN, flux, self.smearing,noise_value)
+            point = (EM_gain, RN, flux, self.smearing,noise_value)
         else:
-            print(n,Emgain, RN, flux, self.smearing,noise_value)
+            print(n,EM_gain, RN, flux, self.smearing,noise_value)
             
-        if ~np.isscalar(noise_value) |  ~np.isscalar(self.smearing) | ~np.isscalar(Emgain) | ~np.isscalar(RN):
+        if ~np.isscalar(noise_value) |  ~np.isscalar(self.smearing) | ~np.isscalar(EM_gain) | ~np.isscalar(RN):
             point = np.repeat(np.zeros((4,1)), self.len_xaxis, axis=1).T
             point[:,0] =  self.EM_gain
             point[:,1] = self.RN
@@ -525,3 +525,248 @@ class Observation:
 
         return threshold, fraction_signal, fraction_rn, snr_ratio#np.nanmax(SNR1/SNR_analogic)
  
+
+
+
+    def SimulateFIREBallemCCDImage(self, conv_gain=0.53,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05):
+        # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dard_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
+        from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
+        from scipy.sparse import dia_matrix
+        from scipy.interpolate import interp1d
+        for key in list(instruments["Charact."]) + ["Signal_el","N_images_true","Dark_current_f","sky"]:
+            if hasattr(self,key ):
+                if (type(getattr(self,key)) != float) & (type(getattr(self,key)) != int) &  (type(getattr(self,key)) != np.float64):
+                    setattr(self, key,getattr(self,key)[self.i])
+                    # print(getattr(self,key))
+                    # print(key, self.i)
+                    # print(getattr(self,key)[self.i])
+                    # a = getattr(self,key)[self.i]
+                    # print(a,self.setattr(key),)
+
+
+
+        OS1, OS2 = OSregions
+        # ConversionGain=1
+        ConversionGain = conv_gain
+        Bias=0
+        image = np.zeros((size[1], size[0]), dtype="float64")
+        image_stack = np.zeros((size[1], size[0]), dtype="float64")
+
+        # self.Dard_current & flux
+        source_im = 0 * image[:, OSregions[0] : OSregions[1]]
+        source_im_wo_atm = 0 * image[:, OSregions[0] : OSregions[1]]
+        lx, ly = source_im.shape
+        y = np.linspace(0, lx - 1, lx)
+        x = np.linspace(0, ly - 1, ly)
+        x, y = np.meshgrid(x, y)
+
+        # Source definition. For now the flux is not normalized at all, need to fix this
+        # Cubes still needs to be implememted, link to detector model or putting it here?
+        # if os.path.isfile(cube):
+        # throughput = self.Throughput.value#0.13*0.9
+        # atm = self.Atmosphere.value#0.45
+        # area = self.Collecting_area.value/100/100#7854
+        # dispersion = 1/self.dispersion.value#46.6/10
+        # wavelength=self.wavelength.value/10 #2000
+        stack = int(self.N_images_true)
+        flux = (self.Signal_el /self.exposure_time)
+        Rx = self.PSF_RMS_det/self.pixel_scale
+        PSF_x = np.sqrt((np.min([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
+        PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
+                        #%%
+
+        if "Spectra" in source:
+            if "baseline" in source.lower():
+                # print(PSF_x,PSF_λ)
+                # print(self.PSF_source,self.pixel_scale,self.PSF_RMS_det,self.pixel_scale)
+                with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)#/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ).sum()
+                # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
+                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) )#/Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x).sum()
+                source_im = source_im.T
+                source_im[:,:] += profile
+                source_im = source_im.T 
+                length = self.Slitlength/2/self.pixel_scale
+                #TODO take into account the PSF: += Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) with special.erf
+                source_im[50-int(length):50+int(length),:] += self.sky/self.exposure_time  
+                
+            # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
+
+
+
+            elif "mNUV=" in source:
+                #%%
+                mag=float(source.split("mNUV=")[-1])
+                factor_lya = fraction_lya
+                flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(self.wavelength*0.0000000001)/0.0000001))
+                elec_pix = flux * self.Throughput * self.Atmosphere * self.QE * self.Collecting_area*100*100 *self.dispersion# should not be multiplied by self.exposure_time time here
+                with_line = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2,PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ).sum()
+                # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
+                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x).sum())
+                source_im = source_im.T
+                source_im[:,:] += profile
+                # source_im = source_im.T
+                # a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
+                # a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
+                # f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])
+                # profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
+                # subim = np.zeros((nsize2,nsize))
+                # wavelengths = np.linspace(2060-yi*dispersion,2060+(1000-yi)*dispersion,nsize2)
+                # source_im[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) * atm_trans(wavelengths) * self.QE(wavelengths)
+                # source_im_wo_atm[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
+                
+            else:
+                # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
+                try:
+                    a = Table.read("Spectra/h_%sfos_spc.fits"%(source.split(" ")[1]))
+                    slits = None#Table.read("Targets/2022/" + field).to_pandas()
+                    trans = Table.read("interpolate/transmission_pix_resolution.csv")
+                    self.QE = Table.read("interpolate/QE_2022.csv")
+                except FileNotFoundError: 
+                    a = Table.read("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
+                    slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
+                    trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
+                    self.QE = Table.read("interpolate/QE_2022.csv")
+                self.QE = interp1d(self.QE["wave"]*10,self.QE["QE_corr"])#
+                trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
+                trans = trans[:-5]
+                atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
+
+                a["photons"] = a["FLUX"]/9.93E-12   
+                a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
+                nsize,nsize2 = 100,500
+                source_im=np.zeros((nsize,nsize2))
+                source_im_wo_atm=np.zeros((nsize2,nsize))
+                mask = (a["WAVELENGTH"]>1960) & (a["WAVELENGTH"]<2280)
+                lmax = a["WAVELENGTH"][mask][np.argmax( a["e_pix_sec"][mask])]
+                # plt.plot( a["WAVELENGTH"],a["e_pix_sec"])
+                # plt.plot( a["WAVELENGTH"][mask],a["e_pix_sec"][mask])
+                f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])#
+                profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
+                subim = np.zeros((nsize2,nsize))
+                wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
+
+                if 1==0:
+                    # source_im=np.zeros((100,100))
+                    # # plt.plot(a["WAVELENGTH"][mask],a["e_pix_exp"][mask])
+                    # profile =   Gaussian1D.evaluate(np.arange(100),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(100),  1,  50, Rx).sum()
+                    # i = np.argmin(abs(a["WAVELENGTH"]-1960))
+                    # source_im[:,:] +=   profile
+                    # source_im = source_im.T*a["e_pix_sec"][i:i+100]                    
+                    fig,(ax0,ax1,ax2) = plt.subplots(3,1)
+                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="Atmosphere impact",alpha=0.3)
+                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="self.QE impact",alpha=0.3)
+                    ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)/(f(wavelengths)* atm_trans(wavelengths)).ptp(),label="Spectra * Atm")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths)/( f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths)).ptp(),label="Spectra * Atm * self.QE")
+                    ax2.plot(wavelengths,atm_trans(wavelengths) ,label="Atmosphere")
+                    ax2.plot(wavelengths,self.QE(wavelengths) ,label="self.QE")
+                    ax0.legend()
+                    ax1.legend()
+                    ax2.legend()
+                    ax0.set_ylabel("e/pix/sec")
+                    ax1.set_ylabel("Moself.RNalized prof")
+                    ax2.set_ylabel("%")
+                    ax2.set_xlabel("wavelength")
+                    ax0.set_title(source.split(" ")[-1])
+                    fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source.split(" ")[-1]))
+                    plt.show()
+                self.QE = self.QE(wavelengths) if QElambda else self.QE(lmax) 
+                atm_trans = atm_trans(wavelengths) if atmlambda else atm_trans(lmax) 
+                source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * self.QE
+                # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
+        source_im = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 +  source_im  * int(self.exposure_time)
+        source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
+        y_pix=1000
+        # print(len(source_im),source_im.shape)
+        self.long = True
+        if (self.readout_time/self.exposure_time > 0.2) & (self.long):
+            # print(source_im)
+            cube = np.array([(self.readout_time/self.exposure_time/y_pix)*np.vstack((np.zeros((i,len(source_im))),source_im[::-1,:][:-i,:]))[::-1,:] for i in np.arange(1,len(source_im))],dtype=float)
+            source_im = source_im+np.sum(cube,axis=0)
+        if self.cosmic_ray_loss_per_sec is None:
+            self.cosmic_ray_loss_per_sec = np.minimum(0.005*(self.exposure_time+self.readout_time/2),1)#+self.readout_time/2
+        # stack = np.max([int(stack * (1-self.cosmic_ray_loss_per_sec)),1])
+        stack = int(self.N_images_true)
+        cube_stack = -np.ones((stack,size[1], size[0]), dtype="int32")
+
+        # print(self.cosmic_ray_loss_per_sec)
+        n_smearing=6
+        # image[:, OSregions[0] : OSregions[1]] += source_im
+        # print(image[:, OSregions[0] : OSregions[1]].shape,source_im.shape)
+        image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
+        # take into acount CR losses
+        #18%
+        # image_stack[:, OSregions[0] : OSregions[1]] = np.nanmean([np.where(np.random.rand(size[1], OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
+        image_stack[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
+        
+        # a = (np.where(np.random.rand(int(stack), size[1],OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype=int) , self.EM_gain))  for i in range(int(stack))]))
+        # Addition of the phyical image on the 2 overscan regions
+        #image += source_im2
+        if p_sCIC>0:
+            image +=  np.random.gamma( np.array(np.random.rand(size[1], size[0])<p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
+            #30%
+            image_stack += np.random.gamma( np.array(np.random.rand(size[1], size[0])<int(stack)*p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
+        if self.counting_mode:
+            a = np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype="int32") , self.EM_gain))  for i in range(int(stack))])
+            cube_stack[:,:, OSregions[0] : OSregions[1]] = a
+            cube_stack += np.random.gamma( np.array(np.random.rand(int(stack),size[1], size[0])<int(stack)*p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape)).astype("int32")
+            # print(cube_stack.shape)
+        #         # addition of pCIC (stil need to add sCIC before EM registers)
+        #         prob_pCIC = np.random.rand(size[1], size[0])  # Draw a number prob in [0,1]
+        #         image[prob_pCIC < self.CIC_charge] += 1
+        #         source_im2_stack[prob_pCIC < p_pCIC*stack] += 1
+
+        #         # EM amp (of source + self.Dard_current + pCIC)
+        #         id_nnul = image != 0
+        #         image[id_nnul] = np.random.gamma(image[id_nnul], self.EM_gain)
+                # Addition of sCIC inside EM registers (ie partially amplified)
+        #         prob_sCIC = np.random.rand(size[1], size[0])  # Draw a number prob in [0,1]
+        #         id_scic = prob_sCIC < p_sCIC  # sCIC positions
+        #         # partial amplification of sCIC
+        #         register = np.random.randint(1, n_registers, size=id_scic.sum())  # Draw at which stage of the EM register the electoself.RN is created
+        #         image[id_scic] += np.random.exponential(np.power(self.EM_gain, register / n_registers))
+            # semaring post EM amp (sgest noise reduction)
+            #TODO must add self.smearing for cube!
+        if self.smearing > 0:
+            # self.smearing dependant on flux
+            #2%
+            smearing_kernels = variable_smearing_kernels(image, self.smearing, SmearExpDecrement)
+            offsets = np.arange(n_smearing)
+            A = dia_matrix((smearing_kernels.reshape((n_smearing, -1)), offsets), shape=(image.size, image.size))
+
+            image = A.dot(image.ravel()).reshape(image.shape)
+            image_stack = A.dot(image_stack.ravel()).reshape(image_stack.shape)
+        #     if self.readout_time > 0:
+        #         # self.smearing dependant on flux
+        #         self.smearing_kernels = variable_smearing.smearing_keself.RNels(image.T, self.readout_time, SmearExpDecrement)#.swapaxes(1,2)
+        #         offsets = np.arange(n_smearing)
+        #         A = dia_matrix((self.smearing_kernels.reshape((n_smearing, -1)), offsets), shape=(image.size, image.size))#.swapaxes(0,1)
+        #         image = A.dot(image.ravel()).reshape(image.shape)#.T
+        #         image_stack = A.dot(image_stack.ravel()).reshape(image_stack.shape)#.T
+        type_ = "int32"
+        type_ = "float64"
+        readout = np.random.normal(Bias, self.RN, (size[1], size[0]))
+        readout_stack = np.random.normal(Bias, self.RN/np.sqrt(int(stack)), (size[1], size[0]))
+        if self.counting_mode:
+            readout_cube = np.random.normal(Bias, self.RN, (int(stack),size[1], size[0])).astype("int32")
+            # print((np.random.rand(source_im.shape[0], source_im.shape[1]) < self.cosmic_ray_loss_per_sec).mean())
+            #TOKEEP  for cosmic ray masking readout[np.random.rand(source_im.shape[0], source_im.shape[1]) < self.cosmic_ray_loss_per_sec]=np.nan
+            #print(np.max(((image + readout) * ConversionGain).round()))
+        #     if np.max(((image + readout) * ConversionGain).round()) > 2 ** 15:
+        imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
+        imaADU_RN = (readout * ConversionGain).round().astype(type_)
+        imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
+        imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
+        if self.counting_mode:
+            imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
+        else:
+            imaADU_cube = imaADU_stack
+        # print(imaADU_cube.shape)
+        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
+
+if __name__ == "__main__":
+    FB = Observation().SimulateFIREBallemCCDImage(conv_gain=0.53,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+# %%
+
+
+# %%
