@@ -20,6 +20,8 @@ from scipy.special import erf
 from astropy.modeling.functional_models import Gaussian2D
 import pandas as pd
 import functools
+from scipy import special
+
 np.seterr(invalid='ignore')
  
 
@@ -55,6 +57,7 @@ def rgetattr(obj, attr, *args):
 
 
 def convert_LU2ergs(LU,wave_nm,pixel_size_arcsec):
+    pixel_size_arcsec=1
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
     angle = pixel_size_arcsec * np.pi / (180 * 3600)
@@ -62,11 +65,12 @@ def convert_LU2ergs(LU,wave_nm,pixel_size_arcsec):
     return flux_ergs
 
 def convert_ergs2LU(flux_ergs,wave_nm,pixel_size_arcsec):
+    pixel_size_arcsec=1
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
-    angle =  pixel_size_arcsec * np.pi / (180 * 3600)
-    # flux_ergs = LU * Energy * angle * angle
+    angle =    np.pi / (180 * 3600) / pixel_size_arcsec
     LU = flux_ergs/ (Energy  * angle * angle)
+    # flux_ergs = LU * Energy * angle * angle
     return LU
 
 def initializer(func):
@@ -131,7 +135,7 @@ class Observation:
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
-
+        self.precise = False
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
         # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\n_smearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
@@ -141,13 +145,14 @@ class Observation:
             self.Signal = 10**(-(Signal-20.08)/2.5)*2.06*1E-16
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
-        self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
-        #convolve input flux by spectral resolution
-        # self.spectro_resolution_A = self.wavelength * self.spectral
-        self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
+        if self.precise:
+            self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
+            #convolve input flux by spectral resolution
+            # self.spectro_resolution_A = self.wavelength * self.spectral
+            self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
 
 
-        if ~np.isnan(self.Slitwidth).all():
+        if ~np.isnan(self.Slitwidth).all() & self.precise:
             # assess flux fraction going through slit
             self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
@@ -193,9 +198,9 @@ class Observation:
         # Compute ratio to convert CU to el/pix 
         if np.isnan(self.Slitwidth).all():
             # If instrument is not a spectro?
-            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str# *self.pixel_scale**2 but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str *self.pixel_scale**2 #but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
         else:
-            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion  #*self.pixel_scale**2  but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A
+            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
         
 
         self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
@@ -571,24 +576,67 @@ class Observation:
         stack = int(self.N_images_true)
         flux = (self.Signal_el /self.exposure_time)
         Rx = self.PSF_RMS_det/self.pixel_scale
-        PSF_x = np.sqrt((np.min([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
+        PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
         PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
                         #%%
+        # nsize,nsize2 = size[1],size[0]
+        wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
+        # wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
+        nsize2, nsize = size
+        # nsize,nsize2 = 100,500
+        wavelengths = np.linspace(wave_min,wave_max,nsize2)
+        if "FIREBall" in self.instrument:
+            trans = Table.read("interpolate/transmission_pix_resolution.csv")
+            QE = Table.read("interpolate/QE_2022.csv")
+            QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
+            # print(trans["col2"],trans)
+            # trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(self.PSF_lambda_pix))/int(self.PSF_lambda_pix),mode="same")
+            trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(5))/int(5),mode="same")
+            trans = trans[:-5]
+            atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
+            QE = QE(wavelengths)  if QElambda else self.QE
+            atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
+        else:
+            trans = Table.read("interpolate/transmission_ground.csv")
+            atm_trans =  interp1d(list(trans["wave_microns"]/1000), list(trans["transmission"]))#
+            atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
+            QE = self.QE
 
-        if "Spectra" in source:
-            if "baseline" in source.lower():
+
+        if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
+            if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
                 # print(PSF_x,PSF_λ)
                 # print(self.PSF_source,self.pixel_scale,self.PSF_RMS_det,self.pixel_scale)
-                with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)#/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ).sum()
+                with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
+                
+                # print("QE",QE)
+                # print("atm_trans",atm_trans)
+                with_line *= atm_trans * QE / (self.QE*self.Atmosphere) 
+                # print(self.Signal_el ,self.exposure_time,flux,with_line)
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) )#/Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x).sum()
+                spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
+                length = self.Slitlength/2/self.pixel_scale
+                if np.isfinite(length):
+                    a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+                    b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+                    spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
+                else:
+                    spatial_profile += (self.sky/self.exposure_time) 
+
+
+                profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                # print(self.PSF_source,self.pixel_scale,PSF_x)
+                # print(flux,with_line ,PSF_x)
                 source_im = source_im.T
                 source_im[:,:] += profile
                 source_im = source_im.T 
-                length = self.Slitlength/2/self.pixel_scale
+                # print(source_im,self.Slitlength,profile,atm_trans , QE,self.QE,self.Atmosphere)
                 #TODO take into account the PSF: += Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) with special.erf
-                source_im[50-int(length):50+int(length),:] += self.sky/self.exposure_time  
-                
+                #     source_im[50-int(length):50+int(length),:] += self.sky/self.exposure_time  
+                # else:
+                #     source_im += self.sky/self.exposure_time  
+                # print(source_im, self.sky,self.exposure_time  )
+
             # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
 
 
@@ -598,10 +646,10 @@ class Observation:
                 mag=float(source.split("mNUV=")[-1])
                 factor_lya = fraction_lya
                 flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(self.wavelength*0.0000000001)/0.0000001))
-                elec_pix = flux * self.Throughput * self.Atmosphere * self.QE * self.Collecting_area*100*100 *self.dispersion# should not be multiplied by self.exposure_time time here
+                elec_pix = flux * self.Throughput  * self.Collecting_area*100*100 *self.dispersion  * trans * QE# * self.Atmosphere * self.QE # should not be multiplied by self.exposure_time time here
                 with_line = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2,PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ).sum()
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x).sum())
+                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x) /Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, Rx).sum())
                 source_im = source_im.T
                 source_im[:,:] += profile
                 # source_im = source_im.T
@@ -616,50 +664,54 @@ class Observation:
                 
             else:
                 # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
-                try:
-                    a = Table.read("Spectra/h_%sfos_spc.fits"%(source.split(" ")[1]))
-                    slits = None#Table.read("Targets/2022/" + field).to_pandas()
-                    trans = Table.read("interpolate/transmission_pix_resolution.csv")
-                    self.QE = Table.read("interpolate/QE_2022.csv")
-                except FileNotFoundError: 
-                    a = Table.read("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
-                    slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
-                    trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
-                    self.QE = Table.read("interpolate/QE_2022.csv")
-                self.QE = interp1d(self.QE["wave"]*10,self.QE["QE_corr"])#
-                trans["trans_conv"] = np.convolve(trans["col2"],np.ones(5)/5,mode="same")
-                trans = trans[:-5]
-                atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
 
-                a["photons"] = a["FLUX"]/9.93E-12   
-                a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
-                nsize,nsize2 = 100,500
+                # print(wave_min, wave_max)
+                if "_" not in source:
+                    try:
+                        a = Table.read("Spectra/h_%sfos_spc.fits"%(source.split(" ")[1]))
+                        flux_name,wave_name ="FLUX", "WAVELENGTH"
+                    except FileNotFoundError: 
+                        a = Table.read("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
+                        # slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
+                        # trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
+                        # self.QE = Table.read("interpolate/QE_2022.csv")
+                    a["photons"] = a[flux_name]/9.93E-12   
+                    a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
+                elif "COSMOS" in source:
+                    a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[1]),format="ascii")
+                    wave_name,flux_name ="col1", "col2"
+                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
+                    a = a[mask]
+                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
+                elif "Salvato" in source:
+                    a = Table.read("Spectra/Salvato/%s.txt"%(source.split(" ")[1]),format="ascii")
+                    wave_name,flux_name ="col1", "col2"
+                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
+                    a = a[mask]
+                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
+                mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
+                slits = None #Table.read("Targets/2022/" + field).to_pandas()
                 source_im=np.zeros((nsize,nsize2))
                 source_im_wo_atm=np.zeros((nsize2,nsize))
-                mask = (a["WAVELENGTH"]>1960) & (a["WAVELENGTH"]<2280)
-                lmax = a["WAVELENGTH"][mask][np.argmax( a["e_pix_sec"][mask])]
+                # mask = (a[wave_name]>1960) & (a[wave_name]<2280)
+                # lmax = a[wave_name][mask][np.argmax( a["e_pix_sec"][mask])]
                 # plt.plot( a["WAVELENGTH"],a["e_pix_sec"])
                 # plt.plot( a["WAVELENGTH"][mask],a["e_pix_sec"][mask])
-                f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])#
-                profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
-                subim = np.zeros((nsize2,nsize))
-                wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
 
+                f = interp1d(a[wave_name],a["e_pix_sec"])#
+                profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
+                subim = np.zeros((nsize2,nsize))
+                source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
+                # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
                 if 1==0:
-                    # source_im=np.zeros((100,100))
-                    # # plt.plot(a["WAVELENGTH"][mask],a["e_pix_exp"][mask])
-                    # profile =   Gaussian1D.evaluate(np.arange(100),  1,  50, Rx) /Gaussian1D.evaluate(np.arange(100),  1,  50, Rx).sum()
-                    # i = np.argmin(abs(a["WAVELENGTH"]-1960))
-                    # source_im[:,:] +=   profile
-                    # source_im = source_im.T*a["e_pix_sec"][i:i+100]                    
                     fig,(ax0,ax1,ax2) = plt.subplots(3,1)
                     ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="Atmosphere impact",alpha=0.3)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="self.QE impact",alpha=0.3)
+                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="self.QE impact",alpha=0.3)
                     ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
                     ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)/(f(wavelengths)* atm_trans(wavelengths)).ptp(),label="Spectra * Atm")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths)/( f(wavelengths)* atm_trans(wavelengths)*self.QE(wavelengths)).ptp(),label="Spectra * Atm * self.QE")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*QE/( f(wavelengths)* atm_trans*QE).ptp(),label="Spectra * Atm * self.QE")
                     ax2.plot(wavelengths,atm_trans(wavelengths) ,label="Atmosphere")
-                    ax2.plot(wavelengths,self.QE(wavelengths) ,label="self.QE")
+                    ax2.plot(wavelengths,QE ,label="self.QE")
                     ax0.legend()
                     ax1.legend()
                     ax2.legend()
@@ -670,15 +722,12 @@ class Observation:
                     ax0.set_title(source.split(" ")[-1])
                     fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source.split(" ")[-1]))
                     plt.show()
-                self.QE = self.QE(wavelengths) if QElambda else self.QE(lmax) 
-                atm_trans = atm_trans(wavelengths) if atmlambda else atm_trans(lmax) 
-                source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * self.QE
-                # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
         source_im = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 +  source_im  * int(self.exposure_time)
+        # print(self.Dark_current_f, self.extra_background , int(self.exposure_time)/3600 ,  source_im  , int(self.exposure_time))
         source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
         y_pix=1000
         # print(len(source_im),source_im.shape)
-        self.long = True
+        self.long = False
         if (self.readout_time/self.exposure_time > 0.2) & (self.long):
             # print(source_im)
             cube = np.array([(self.readout_time/self.exposure_time/y_pix)*np.vstack((np.zeros((i,len(source_im))),source_im[::-1,:][:-i,:]))[::-1,:] for i in np.arange(1,len(source_im))],dtype=float)
@@ -693,7 +742,11 @@ class Observation:
         n_smearing=6
         # image[:, OSregions[0] : OSregions[1]] += source_im
         # print(image[:, OSregions[0] : OSregions[1]].shape,source_im.shape)
-        image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
+        if (self.EM_gain>1) & (self.CIC_charge>0):
+            image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
+        else:
+            # print(source_im)
+            image[:, OSregions[0] : OSregions[1]] += np.random.poisson(source_im)
         # take into acount CR losses
         #18%
         # image_stack[:, OSregions[0] : OSregions[1]] = np.nanmean([np.where(np.random.rand(size[1], OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
@@ -757,6 +810,7 @@ class Observation:
         imaADU_RN = (readout * ConversionGain).round().astype(type_)
         imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
         imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
+        # print(image_stack,readout_stack)
         if self.counting_mode:
             imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
         else:

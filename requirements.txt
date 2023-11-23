@@ -16,7 +16,8 @@ pandas
 Pillow
 cycler
 nbimporter
-
+specsim
+# specreduce
 #google_drive_downloader
 #ipyvolume
 #django
