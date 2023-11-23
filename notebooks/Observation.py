@@ -598,9 +598,15 @@ class Observation:
             atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
         else:
             trans = Table.read("interpolate/transmission_ground.csv")
-            atm_trans =  interp1d(list(trans["wave_microns"]/1000), list(trans["transmission"]))#
+            atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
+            # print(wavelengths.min(),wavelengths.max(),(trans["wave_microns"]/1000).min(),(trans["wave_microns"]/1000).max())
             atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
             QE = self.QE
+        atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
+
+        length = self.Slitlength/2/self.pixel_scale
+        a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+        b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
 
 
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
@@ -611,22 +617,23 @@ class Observation:
                 
                 # print("QE",QE)
                 # print("atm_trans",atm_trans)
-                with_line *= atm_trans * QE / (self.QE*self.Atmosphere) 
+                with_line *= atm_qe
                 # print(self.Signal_el ,self.exposure_time,flux,with_line)
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-                length = self.Slitlength/2/self.pixel_scale
-                a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
-                b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
-                if np.isfinite(length) & ( (a + b).ptp()>0):
-                    spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
-                else:
-                    spatial_profile += (self.sky/self.exposure_time) 
+                # spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
                 
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
 
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+
+                if np.isfinite(length) & ( (a + b).ptp()>0):
+                    # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a + b) / (a + b).ptp() )
+                else:
+                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
+
                 # print(with_line,spatial_profile ,profile)
                 # print(self.PSF_source,self.pixel_scale,PSF_x)
                 # print(flux,with_line ,PSF_x)
@@ -705,6 +712,13 @@ class Observation:
                 profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
                 subim = np.zeros((nsize2,nsize))
                 source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
+
+                if np.isfinite(length) & ( (a + b).ptp()>0):
+                    # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a + b) / (a + b).ptp() )
+                else:
+                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
+
                 # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
                 if 1==0:
                     fig,(ax0,ax1,ax2) = plt.subplots(3,1)
