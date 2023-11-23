@@ -533,7 +533,7 @@ class Observation:
 
 
 
-    def SimulateFIREBallemCCDImage(self, conv_gain=0.53,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05):
+    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=20):
         # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dard_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
         from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
         from scipy.sparse import dia_matrix
@@ -549,7 +549,7 @@ class Observation:
                     # print(a,self.setattr(key),)
 
 
-
+        conv_gain=conversion_gain
         OS1, OS2 = OSregions
         # ConversionGain=1
         ConversionGain = conv_gain
@@ -592,8 +592,9 @@ class Observation:
             # print(trans["col2"],trans)
             # trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(self.PSF_lambda_pix))/int(self.PSF_lambda_pix),mode="same")
             trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(5))/int(5),mode="same")
-            trans = trans[:-5]
-            atm_trans =  interp1d([1500,2500]+list(trans["col1"]*10),[0,0] + list(trans["trans_conv"]))#
+            # trans = trans[:-5]
+            atm_trans =  interp1d(list(trans["col1"]*10),list(trans["trans_conv"]))#
+            # print(wavelengths.min(),wavelengths.max(), trans["col1"].min(),trans["col1"].max())
             QE = QE(wavelengths)  if QElambda else self.QE
             atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
         else:
@@ -601,7 +602,8 @@ class Observation:
             atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
             # print(wavelengths.min(),wavelengths.max(),(trans["wave_microns"]/1000).min(),(trans["wave_microns"]/1000).max())
             atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
-            QE = self.QE
+            QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
+            # print(QE)
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
 
         length = self.Slitlength/2/self.pixel_scale
@@ -614,7 +616,6 @@ class Observation:
                 # print(PSF_x,PSF_λ)
                 # print(self.PSF_source,self.pixel_scale,self.PSF_RMS_det,self.pixel_scale)
                 with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
-                
                 # print("QE",QE)
                 # print("atm_trans",atm_trans)
                 with_line *= atm_qe
@@ -622,18 +623,14 @@ class Observation:
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
                 # spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
-                
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
-
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-
                 if np.isfinite(length) & ( (a + b).ptp()>0):
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
                     profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a + b) / (a + b).ptp() )
                 else:
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
-
                 # print(with_line,spatial_profile ,profile)
                 # print(self.PSF_source,self.pixel_scale,PSF_x)
                 # print(flux,with_line ,PSF_x)
@@ -833,6 +830,7 @@ class Observation:
         else:
             imaADU_cube = imaADU_stack
         # print(imaADU_cube.shape)
+        imaADU[imaADU>Full_well*1000] = np.nan
         return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
 
 if __name__ == "__main__":
