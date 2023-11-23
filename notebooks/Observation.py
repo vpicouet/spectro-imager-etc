@@ -135,7 +135,7 @@ class Observation:
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
-        self.precise = False
+        self.precise = True
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
         # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\n_smearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
@@ -616,15 +616,18 @@ class Observation:
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
                 length = self.Slitlength/2/self.pixel_scale
-                if np.isfinite(length):
-                    a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
-                    b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+                a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+                b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+                if np.isfinite(length) & ( (a + b).ptp()>0):
                     spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
                 else:
                     spatial_profile += (self.sky/self.exposure_time) 
-
+                
+                # print( length, a, b, Rx )
+                # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
 
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                # print(with_line,spatial_profile ,profile)
                 # print(self.PSF_source,self.pixel_scale,PSF_x)
                 # print(flux,with_line ,PSF_x)
                 source_im = source_im.T
