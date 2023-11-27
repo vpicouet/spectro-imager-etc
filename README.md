@@ -84,7 +84,7 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$N_{images} = \frac{Ttot_s}{Texp_s + Tread_s} \times (1-CRloss_{\%}) $
+$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{\%}) $
 
 
 In the case of electron amplified CCDs, some considerations must be taken into account:
