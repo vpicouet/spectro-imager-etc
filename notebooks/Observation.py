@@ -533,7 +533,7 @@ class Observation:
 
 
 
-    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=20):
+    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=20, Altitude=35):
         # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dard_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
         from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
         from scipy.sparse import dia_matrix
@@ -578,7 +578,7 @@ class Observation:
         Rx = self.PSF_RMS_det/self.pixel_scale
         PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
         PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
-                        #%%
+                    
         # nsize,nsize2 = size[1],size[0]
         wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
         # wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
@@ -596,12 +596,12 @@ class Observation:
             atm_trans =  interp1d(list(trans["col1"]*10),list(trans["trans_conv"]))#
             # print(wavelengths.min(),wavelengths.max(), trans["col1"].min(),trans["col1"].max())
             QE = QE(wavelengths)  if QElambda else self.QE
-            atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
+            atm_trans = atm_trans(wavelengths)   if (atmlambda & (Altitude<100) ) else self.Atmosphere
         else:
             trans = Table.read("interpolate/transmission_ground.csv")
             atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
             # print(wavelengths.min(),wavelengths.max(),(trans["wave_microns"]/1000).min(),(trans["wave_microns"]/1000).max())
-            atm_trans = atm_trans(wavelengths)  if atmlambda else self.Atmosphere
+            atm_trans = atm_trans(wavelengths)  if (atmlambda & (Altitude<100) ) else self.Atmosphere
             QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
             # print(QE)
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
@@ -834,7 +834,7 @@ class Observation:
         return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
 
 if __name__ == "__main__":
-    FB = Observation().SimulateFIREBallemCCDImage(conv_gain=0.53,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+    FB = Observation().SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
 # %%
 
 
