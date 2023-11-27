@@ -1,7 +1,7 @@
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/vpicouet/fireball2-etc/main?labpath=notebooks%2FETC.ipynb)
 
 Click on the video to access to the ETC
-[![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/ETC.gif)](https://www.youtube.com/watch?v=XcDm2JQDMLY)
+[![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/etc.mp4)](https://www.youtube.com/watch?v=XcDm2JQDMLY)
 You can add your instrument characteristics [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing)
 
 [![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/Instruments.jpg)](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing)
@@ -84,7 +84,7 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$$N_{images} = \frac{Ttot_{sec}}{Texp_{sec} + Tread_{sec}} \times (1-CRloss_{٪}) $$
+$$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{٪}) $$
 
 In the case of electron amplified CCDs, some considerations must be taken into account:
 - the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{EMGain_{e-/e-}}$
