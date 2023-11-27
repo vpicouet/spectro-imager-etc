@@ -1,3 +1,4 @@
+```
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/vpicouet/fireball2-etc/main?labpath=notebooks%2FETC.ipynb)
 
 Click on the video to access to the ETC
@@ -116,3 +117,6 @@ When doing some photon-counting emCCD thresholding, some new considerations must
 
 
 ![alternative text](description/Chart.jpg)
+
+
+```
