@@ -1,4 +1,3 @@
-```
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/vpicouet/fireball2-etc/main?labpath=notebooks%2FETC.ipynb)
 
 Click on the video to access to the ETC
@@ -85,7 +84,7 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$N_{images} = \frac{Ttot_s}{Texp_s + Tread_s} \times (1-CRloss_\%) $
+$N_{images} = \frac{Ttot_s}{Texp_s + Tread_s} \times (1-CRloss_{\%}) $
 
 
 In the case of electron amplified CCDs, some considerations must be taken into account:
@@ -118,5 +117,3 @@ When doing some photon-counting emCCD thresholding, some new considerations must
 
 ![alternative text](description/Chart.jpg)
 
-
-```
