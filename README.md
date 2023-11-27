@@ -84,7 +84,7 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$$N_{images} = \frac{Ttot_{sec}}{Texp_{sec} + Tread_{sec}} \times (1-CRloss) $$
+$$N_{images} = \frac{Ttot_{sec}}{Texp_{sec} + Tread_{sec}} \times (1-CRloss_{\%}) $$
 
 In the case of electron amplified CCDs, some considerations must be taken into account:
 - the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{EMGain_{e-/e-}}$
