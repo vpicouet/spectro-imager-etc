@@ -59,9 +59,9 @@ Then, both contributions are converted similarly into electrons per pixels:
 
 
 
-$Sky_{e-/pix/exp} = Sky_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix}  \times Texp_s \times Atm_\%\times  Area_\% \times Throughput_\%  \times QE_\%  $ 
+$$Sky_{e-/pix/exp} = Sky_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix}  \times Texp_s \times Atm_{\%}\times  Area_{\%} \times Throughput_{\%}  \times QE_{\%}  $$
 
-$Signal_{e-/pix/exp} = Signal_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix} \times Texp_s \times Atm_\%\times  Area_\% \times Throughput_\%  \times QE_\%  $
+$$Signal_{e-/pix/exp} = Signal_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix} \times Texp_s \times Atm_\%\times  Area_\% \times Throughput_{\%}  \times QE_{\%}  $$
 
 <!-- If the instrument is an imager (no slit and no dispersion), we replace the factor $ Slitwidth_{str}  \times Dispersion_{Å/pix}$ by $FOV_{str} \times Bandwidth_{Å} $. -->
 
@@ -70,7 +70,7 @@ $Signal_{e-/pix/exp} = Signal_{CU} \times Slitwidth_{str}  \times Dispersion_{Å
 Other contributions (dark current, read-noise, CIC, straylight) are easier to account for.
 Dark and straylight are used with the same unit: $e-/pix/hour$. Therefore:
 
-$Dark_{e-/pix/exp} = Dark_{e-/pix/hour} \times \frac{ Texp_s }{3600}$
+$Dark_{e-/pix/exp} = Dark_{e-/pix/hour} \times \frac{ Texp_{s} }{3600}$
 
 CIC (Clock induced charges) which are charges induced in electron amplified CCD, are already given in e-/pix/exp.
 Read noise is usually also given in e-/pix/exp.
@@ -84,8 +84,7 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{\%}) $
-
+$$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{\%}) $$
 
 In the case of electron amplified CCDs, some considerations must be taken into account:
 - the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{EMGain_{e-/e-}}$
