@@ -56,19 +56,17 @@ def rgetattr(obj, attr, *args):
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
-def convert_LU2ergs(LU,wave_nm,pixel_size_arcsec):
-    pixel_size_arcsec=1
+def convert_LU2ergs(LU,wave_nm):
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
-    angle = pixel_size_arcsec * np.pi / (180 * 3600)
+    angle =  np.pi / (180 * 3600)
     flux_ergs = LU * Energy * angle * angle
     return flux_ergs
 
-def convert_ergs2LU(flux_ergs,wave_nm,pixel_size_arcsec):
-    pixel_size_arcsec=1
+def convert_ergs2LU(flux_ergs,wave_nm):
     wave =wave_nm * 1e-7 #/ (1+redshift)
     Energy = 6.62e-27 * 3e10 / wave
-    angle =    np.pi / (180 * 3600) / pixel_size_arcsec
+    angle =    np.pi / (180 * 3600) 
     LU = flux_ergs/ (Energy  * angle * angle)
     # flux_ergs = LU * Energy * angle * angle
     return LU
@@ -167,7 +165,7 @@ class Observation:
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777']
         self.colors= [red, violet, yellow  ,blue, green, pink, grey ]
-        # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength,self.pixel_scale)
+        # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength)
         # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
         self.ENF = 1 if self.counting_mode else 2 # Excess Noise Factor 
@@ -180,8 +178,8 @@ class Observation:
         self.pixel_size_arcsec = self.pixel_scale
         # self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
         self.arcsec2str = (np.pi/180/3600)**2
-        self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength,self.pixel_size_arcsec) 
-        # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength,self.pixel_size_arcsec) 
+        self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength) 
+        # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
         # TODO use astropy.unit
         if self.counting_mode:
@@ -217,7 +215,7 @@ class Observation:
         self.N_images = self.acquisition_time*3600/(self.exposure_time + self.readout_time)
         self.N_images_true = self.N_images * (1-self.cosmic_ray_loss)
 
-        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength,self.pixel_size_arcsec)
+        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
         # if 1==0: # if line is totally resolved (for cosmic web for instance)
         #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
         # else: # if line is unresolved for QSO for instance
@@ -256,7 +254,7 @@ class Observation:
         self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma**2 * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
         self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
         self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu
-        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength,self.pixel_size_arcsec) # self.signal_nsig_LU * self.lu2ergs
+        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.snrs)
@@ -609,8 +607,8 @@ class Observation:
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
 
         length = self.Slitlength/2/self.pixel_scale
-        a = special.erf((length - (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
-        b = special.erf((length + (np.linspace(0,100,100) - 50)) / np.sqrt(2 * Rx ** 2))
+        a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
+        b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
 
 
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
@@ -628,9 +626,9 @@ class Observation:
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-                if np.isfinite(length) & ( (a + b).ptp()>0):
+                if np.isfinite(length) & ((a_ + b_).ptp()>0):
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a + b) / (a + b).ptp() )
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
                 else:
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
                 # print(with_line,spatial_profile ,profile)
@@ -639,14 +637,6 @@ class Observation:
                 source_im = source_im.T
                 source_im[:,:] += profile
                 source_im = source_im.T 
-                # print(source_im,self.Slitlength,profile,atm_trans , QE,self.QE,self.Atmosphere)
-                #TODO take into account the PSF: += Gaussian1D.evaluate(np.arange(size[1]),  1,  50, PSF_x) with special.erf
-                #     source_im[50-int(length):50+int(length),:] += self.sky/self.exposure_time  
-                # else:
-                #     source_im += self.sky/self.exposure_time  
-                # print(source_im, self.sky,self.exposure_time  )
-
-            # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
 
 
 
@@ -701,21 +691,18 @@ class Observation:
                 slits = None #Table.read("Targets/2022/" + field).to_pandas()
                 source_im=np.zeros((nsize,nsize2))
                 source_im_wo_atm=np.zeros((nsize2,nsize))
-                # mask = (a[wave_name]>1960) & (a[wave_name]<2280)
-                # lmax = a[wave_name][mask][np.argmax( a["e_pix_sec"][mask])]
-                # plt.plot( a["WAVELENGTH"],a["e_pix_sec"])
-                # plt.plot( a["WAVELENGTH"][mask],a["e_pix_sec"][mask])
-
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
-                profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
+                profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
+
+                if np.isfinite(length) & ( (a_ + b_).ptp()>0):
+                    # print(self.sky,self.exposure_time,a_,profile.shape)
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
+                else:
+                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
+
                 subim = np.zeros((nsize2,nsize))
                 source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
 
-                if np.isfinite(length) & ( (a + b).ptp()>0):
-                    # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a + b) / (a + b).ptp() )
-                else:
-                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
 
                 # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
                 if 1==0:
