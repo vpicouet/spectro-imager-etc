@@ -19,14 +19,14 @@ The ETC GUI serves as a valuable resource, offering a quick overview of not only
 
 ## Variables
 
-The different variables used which can all be used in the x axis to analyze the impact on SNR are:
+The different variables used which can all be used in the x-axis to analyze the impact on SNR are:
 - **Source:** flux, sky, source extension, source's line width
 - **Observing strategy:** Exposure time, total acquisition time, atmospheric transmission, observed wavelength, distance to source/line center
 - **Instrument design:** collecting area, plate scale, instrument throughput, spatial resolution (at the mask and at the detector)
 - **Spectrograph design:** spectral resolution, slit width, dispersion
 - **Detector parameters:** quantum efficiency, dark current, read noise, readout time, pixel size, image loss due to cosmic ray
 - **emCCD additional parameters:** EM gain, CIC, thresholding, smearing exponential length and temperature if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
-- **Image simulator related parameters:** Full well of the detector, conversion gain and throughput FWHM to add the λ dependancy.
+- **Image simulator-related parameters:** Full well of the detector, conversion gain and throughput FWHM to add the λ dependency.
 
 
 
@@ -49,8 +49,8 @@ The code assumes a standard (λ-dependent) atmospheric transmission for ground i
 ## Sky and signal
 The sky and signal contributions are first converted from $ergs/cm^2/s/asec^2/Å$ to photons/cm $^2$/s/sr/Å (continuum unit): $CU =   \frac{Flux}{\frac{h c}{ \lambda} \times \frac{\pi}{ 180 \times 3600}^2 }$
 
-Note the wavelength dependancy in the formula. 
-We decide deliberately to use flux per Angstrom with a gaussian profile so that the user can simulate both a continuum or an unresolved line. 
+Note the wavelength dependency in the formula. 
+We decided deliberately to use flux per Angstrom with a gaussian profile so that the user can simulate both a continuum or an unresolved line. 
 Users can also directly upload spectra in  $ergs/cm^2/s/asec^2/Å$ in the GitHub repository (under notebooks/Spectra, λ in nanometers on the first column and with no column name).
 
 Then, both contributions are converted similarly into electrons per pixels:
@@ -86,7 +86,7 @@ The number of effective images is:
 
 $$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{٪}) $$
 
-In the case of electron amplified CCDs, some considerations must be taken into account:
+In the case of electron-amplified CCDs, some considerations must be taken into account:
 - the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{EMGain_{e-/e-}}$
 - an excess noise factor of $\sqrt{2}$  must be used to account for the stochastic amplification (if no thresholding method is applied)
 
