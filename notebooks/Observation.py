@@ -1,6 +1,9 @@
 from astropy.table import Table
 import warnings
 warnings.filterwarnings("ignore")
+# import matplotlib
+# matplotlib.use('Agg')
+
 from ipywidgets import Button, Layout, jslink, IntText, IntSlider, interactive, interact, HBox, Layout, VBox
 from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
 import os
@@ -124,11 +127,11 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
     smearing_kernels /= smearing_kernels.sum(axis=0)
     return smearing_kernels   
 
-
+#temperature=-100,
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -142,7 +145,7 @@ class Observation:
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
         # Simple hack to me able to use UV magnitudes (not used for the ETC)
         if np.max([self.Signal])>1:
-            self.Signal = 10**(-(Signal-20.08)/2.5)*2.06*1E-16
+            self.Signal = 10**(-(self.Signal-20.08)/2.5)*2.06*1E-16
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
         if self.precise:
@@ -157,7 +160,8 @@ class Observation:
             self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
         else:
             self.flux_fraction_slit = 1
-        
+        # if self.smearing>0:
+        self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
         self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
         self.PSF_lambda_pix = self.wavelength / self.Spectral_resolution / self.dispersion
 
@@ -359,7 +363,6 @@ class Observation:
         RN = self.RN if np.isscalar(self.RN) else self.RN[i]#80
         CIC_noise = self.CIC_noise if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
         dark_noise = self.Dark_current_noise if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
-         
         try:
             Sky_noise = self.Sky_noise_pre_thresholding if np.isscalar(self.Sky_noise_pre_thresholding) else self.Sky_noise_pre_thresholding[i]
         except AttributeError:
@@ -372,6 +375,9 @@ class Observation:
         bins = np.arange(np.min(imaADU)-5*RN*ConversionGain,np.max(imaADU)+5*RN*ConversionGain,25)
         # bins = np.linspace(-500,10000,400)
         #imaADU = (np.random.gamma(im, EM_gain) + np.random.normal(0, RN, size=size))*ConversionGain
+        imaADU_copy = imaADU.copy()
+        imaADU_copy += np.random.normal(0, RN, size=size)*ConversionGain
+
         if plot_:
             if axes is None:
                 fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,figsize=(12, 7))#,figsize=(9,5))
@@ -380,9 +386,12 @@ class Observation:
                 ax1, ax2 = axes
                 ax1.clear()
                 ax2.clear()
-            val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k',label='Before ampl & smearing')
-            val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
-            val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            val0,_,l0 = ax1.hist(imaADU_copy[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k',label='Before ampl & smearing')
+            val1,_,l1 = ax1.hist(imaADU_copy[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k')
+            val2,_,l2 = ax1.hist(imaADU_copy[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
 
 
         if self.smearing > 0:
@@ -396,15 +405,78 @@ class Observation:
 
             imaADU = A.dot(imaADU.ravel()).reshape(imaADU.shape)
         imaADU += np.random.normal(0, RN, size=size)*ConversionGain
+
+        if 1==0:
+            b = (bins[:-1]+bins[1:])/2
+            rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
+            rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
+            signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+
+            pc = np.ones(len(b))# 
+                # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+            pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+
+            if dark_cic_sky_noise is None:
+                noise = CIC_noise**2+dark_noise**2+Sky_noise**2
+            else:
+                noise = dark_cic_sky_noise
+            # print('noises = ',noise)
+            SNR1 = pc*signal1/np.sqrt(signal1+noise)#+np.array(rn_noise)**2
+            SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
+            SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
+            # print('SNR_analogic = ',SNR_analogic)
+            threshold_55 = 5.5*RN*ConversionGain
+            id_55 =  np.argmin(abs(threshold_55 - b))
+            # if threshold<-5:
+            #     id_t = np.nanargmax(SNR1)
+            #     threshold = b[id_t]
+            # else:
+            #     threshold *= RN*ConversionGain
+            #     id_t = np.argmin(abs(threshold - b))
+            # # print(threshold)
+            # fraction_signal = np.sum(val1[id_t:])/np.sum(val1)
+            # fraction_rn = np.sum(val0[id_t:])/np.sum(val0)
+            lw=3
+            if plot_:
+                ax2.plot(b,rn_frac,lw=lw,ls=":",c="C0")#,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t])
+                ax2.plot(b,signal1/flux,lw=lw,ls=":",c="C1")#,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux)
+                # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
+                ax2.plot(b,pc,lw=lw,ls=":",c="C2")#,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t])
+                #ax2.plot(b,SNR1/pc,label='SNR without fraction')
+
+                # ax2.plot(b,SNR1/np.nanmax(SNR1),lw=lw,c="C4") # ,label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t])#'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
+                # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
+                ax2.plot(b,SNR1/SNR_analogic,lw=lw,ls=":",c="C3")#,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic)
+
         if plot_:
             val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,label='0',log=True)
             val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,label='1',log=True)
             val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,label='2',log=True)
+            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,label='3',log=True)
+            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,label='4',log=True)
+            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,label='5',log=True)
             ax1.hist(imaADU.flatten(),bins=bins,label='Total histogram',log=True,histtype='step',lw=1,color='k')
+            # ax1.fill_between([bins[np.argmin(val0>val1)],bins[np.argmax(val0>val1)]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
+            # a0 = np.where(val0>val1)[0].max()
+            # a1 = np.where((val1>val2)&(val1>val0))[0].max()
+            # a2 = np.where((val2>val3)&(val2>val1))[0].max()
+            # a3 = np.where((val3>val4)&(val3>val2))[0].max()
+            # a4 = np.where((val4>val5)&(val4>val3))[0].max()
+            # ax1.fill_between([ bins[0],bins[a0]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
+            # ax1.fill_between([bins[a0],bins[a1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C1")
+            # ax1.fill_between([bins[a1],bins[a2]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C2")
+            # ax1.fill_between([bins[a2],bins[a3]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C3")
+            # ax1.fill_between([bins[a3],bins[a4]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C4")
+            # ax1.fill_between([bins[a4],bins[-1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C5")
         else:
             val0,_ = np.histogram(imaADU[im==0],bins=bins)#,alpha=0.5,label='0',log=True)
             val1,_ = np.histogram(imaADU[im==1],bins=bins)#,alpha=0.5,label='1',log=True)
             val2,_ = np.histogram(imaADU[im==2],bins=bins)#,alpha=0.5,label='2',log=True)
+            val3,_ = np.histogram(imaADU[im==3],bins=bins)
+            val4,_ = np.histogram(imaADU[im==4],bins=bins)
+            val5,_ = np.histogram(imaADU[im==5],bins=bins)
 
         b = (bins[:-1]+bins[1:])/2
         rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
@@ -427,27 +499,28 @@ class Observation:
         SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
         # print('SNR_analogic = ',SNR_analogic)
         threshold_55 = 5.5*RN*ConversionGain
-        id_55 =  np.argmin(abs(threshold_55 - b))
+        id_55 =  np.nanargmin(abs(threshold_55 - b))
         if threshold<-5:
             id_t = np.nanargmax(SNR1)
             threshold = b[id_t]
         else:
             threshold *= RN*ConversionGain
-            id_t = np.argmin(abs(threshold - b))
+            id_t = np.nanargmin(abs(threshold - b))
         # print(threshold)
-        fraction_signal = np.sum(val1[id_t:])/np.sum(val1)
-        fraction_rn = np.sum(val0[id_t:])/np.sum(val0)
+        fraction_signal = np.nansum(val1[id_t:])/np.nansum(val1)
+        fraction_rn = np.nansum(val0[id_t:])/np.nansum(val0)
         lw=3
         if plot_:
-            ax2.plot(b,signal1/flux,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux),lw=lw)
-            ax2.plot(b,rn_frac,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw)
+            ax2.plot(b,rn_frac,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw,c="C0")
+            ax2.plot(b,signal1/flux,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux),lw=lw,c="C1")
             # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
-            ax2.plot(b,pc,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t]),lw=lw)
+            ax2.plot(b,pc,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t]),lw=lw,c="C2")
             #ax2.plot(b,SNR1/pc,label='SNR without fraction')
-
-            ax2.plot(b,SNR1/SNR1.max(),label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t]),lw=lw) #'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
+            # print(SNR1)
+            # print(SNR1/SNR1.max())
+            # ax2.plot(b,SNR1/np.nanmax(SNR1),label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t]),lw=lw,c="C4") #'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
             # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
-            ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw)
+            ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw,c="C3")
             # ax2.plot(b,SNR12/SNR_analogic,':',label='SNR12 PC / SNR analogic',lw=lw)
             # ax2.set_yscale('log')
             ax2.set_ylim(ymin=1e-5)
@@ -455,24 +528,27 @@ class Observation:
             # ax2.plot(b,SNR1,label='[N1]/[N0] = %0.2f, frac(N1)=%i%%'%(val1[id_t]/val0[id_t],100*np.sum(val1[id_t:])/np.sum(val1)))
             # ax2.plot(b,SNR12,label='[N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))))
 
-            L = ax1.legend(fontsize=10)
             ax2.legend(title = "T = 5.5σ ➛ %0.1fσ "%(threshold/(RN*ConversionGain)), fontsize=10)
             ax2.set_xlabel('ADU')
             ax1.set_ylabel('#')
             ax2.set_ylabel('SNR')
-            L.get_texts()[1].set_text('0 e- : %i%%, faction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
-            L.get_texts()[2].set_text('1 e- : %i%%, faction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
-            L.get_texts()[3].set_text('2 e- : %i%%, faction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
-            ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k')
+            ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k',label=r"SNR optimal threshold")
             ax2.plot([threshold,threshold],[0,1],':',c='k')
-            ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k')
+            ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k',label=r"5.5 $\sigma_{RN}$ threshold")
             ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
+            L = ax1.legend(fontsize=10)
+            L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
+            L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
+            L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
 
             ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(EM_gain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
-            ax1.set_xlim(xmin=bins.min(),xmax=7000)#bins.max())
+            ax1.set_xlim(xmin=bins.min(),xmax=5000)#bins.max())
+            # ax1.set_xlim(xmin=bins.min(),xmax=bins.max()/2)
             if axes is None:
                 fig.tight_layout()
-            return fig
+            plt.show()
+            # return fig
+        # sys.exit()
         return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)
  
 
@@ -490,7 +566,7 @@ class Observation:
         try:
             Sky_noise = self.Sky_noise_pre_thresholding #if np.isscalar(self.Sky_noise_pre_thresholding) else self.Sky_noise_pre_thresholding[i]
         except AttributeError:
-            raise AttributeError('You must use counting_mode=True to use compute_optimal_threshold method.')
+            raise AttributeError('You must use counting_mode=True to use interpolate_optimal_threshold method.')
 
         noise_value = CIC_noise**2+dark_noise**2+Sky_noise**2
         
@@ -665,11 +741,13 @@ class Observation:
 
                 # print(wave_min, wave_max)
                 if "_" not in source:
+                    flux_name,wave_name ="FLUX", "WAVELENGTH"
+                    fname = "h_%sfos_spc.fits"%(source.split(" ")[1])
+                    # print(fname)
                     try:
-                        a = Table.read("Spectra/h_%sfos_spc.fits"%(source.split(" ")[1]))
-                        flux_name,wave_name ="FLUX", "WAVELENGTH"
+                        a = Table.read("Spectra/"+fname)
                     except FileNotFoundError: 
-                        a = Table.read("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.fits"%(source.split(" ")[-1]))
+                        a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
                         # slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
                         # trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
                         # self.QE = Table.read("interpolate/QE_2022.csv")
@@ -705,25 +783,26 @@ class Observation:
 
 
                 # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-                if 1==0:
-                    fig,(ax0,ax1,ax2) = plt.subplots(3,1)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="Atmosphere impact",alpha=0.3)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans(wavelengths)*QE(wavelengths),profile.max()* f(wavelengths) * atm_trans(wavelengths),label="self.QE impact",alpha=0.3)
+                if 1==1:
+                    fig,(ax0,ax1,ax2) = plt.subplots(3,1,sharex=True,figsize=(12,8))
+                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans,label="Atmosphere impact",alpha=0.3)
+                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans*QE,profile.max()* f(wavelengths) * atm_trans,label="self.QE impact",alpha=0.3)
                     ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)/(f(wavelengths)* atm_trans(wavelengths)).ptp(),label="Spectra * Atm")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans(wavelengths)*QE/( f(wavelengths)* atm_trans*QE).ptp(),label="Spectra * Atm * self.QE")
-                    ax2.plot(wavelengths,atm_trans(wavelengths) ,label="Atmosphere")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans/(f(wavelengths)* atm_trans).ptp(),label="Spectra * Atm")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans*QE/( f(wavelengths)* atm_trans*QE).ptp(),label="Spectra * Atm * self.QE")
+                    ax2.plot(wavelengths,atm_trans ,label="Atmosphere")
                     ax2.plot(wavelengths,QE ,label="self.QE")
                     ax0.legend()
                     ax1.legend()
                     ax2.legend()
                     ax0.set_ylabel("e/pix/sec")
-                    ax1.set_ylabel("Moself.RNalized prof")
+                    ax1.set_ylabel("Normalized prof")
                     ax2.set_ylabel("%")
                     ax2.set_xlabel("wavelength")
-                    ax0.set_title(source.split(" ")[-1])
-                    fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source.split(" ")[-1]))
-                    plt.show()
+                    ax0.set_title(source)
+                    fig.tight_layout()
+                    fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source))
+                    # plt.show()
         source_im = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 +  source_im  * int(self.exposure_time)
         # print(self.Dark_current_f, self.extra_background , int(self.exposure_time)/3600 ,  source_im  , int(self.exposure_time))
         source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
