@@ -186,7 +186,7 @@ class Observation:
         # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
         # TODO use astropy.unit
-        if (self.counting_mode) & (self.self.EM_gain >1) :
+        if (self.counting_mode) & (self.EM_gain >1) :
             self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
             self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
