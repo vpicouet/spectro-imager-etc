@@ -1,3 +1,98 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 11 09:32:46 2024
+
+@author: Vincent
+"""
+
+import os
+from astropy.io import fits
+import matplotlib.pyplot as plt
+
+# Define the folder containing the FITS images
+folder_path = '/Users/Vincent/DS9QuickLookPlugIn/subsets/CIT_NUVU_m100_darks_2022/test/'
+
+# Get a list of all FITS files in the folder
+fits_files = [f for f in os.listdir(folder_path) if f.endswith('.fits')]
+fits_files.sort()
+# Create a subplot with two columns
+fig, axs = plt.subplots(2, 1, figsize=(12,10),sharex=True)
+
+# Loop through each FITS file
+for i, fits_file in enumerate(fits_files):
+    # Open the FITS file
+    with fits.open(os.path.join(folder_path, fits_file)) as hdul:
+        # Read the data from the first HDU (assuming image data is in the first HDU)
+        data = hdul[0].data
+        print(hdul[0].header["EXPTIME"])
+        # Plot the histogram of the first 1000 columns in log scale
+        
+        axs[0].hist(data[:, :1000].flatten(), bins=500, range=(1000,5000),log=True,histtype='step',label=hdul[0].header["EMGAIN"])
+        # axs[0].set_title(fits_file + ' - First 1000 Columns')
+        
+        # Plot the histogram of the next 1000 columns in log scale
+        axs[1].hist(data[:, 1000:2000].flatten(), bins=500, range=(1000,5000),log=True,histtype='step',label=hdul[0].header["EMGAIN"])
+        # axs[1].set_title(fits_file + ' - Next 1000 Columns')
+axs[0].legend()
+axs[1].legend()
+# Adjust layout
+plt.tight_layout()
+
+# Show the plots
+plt.show()
+
+#%%
+
+CIC = 0.01
+dark = 0.1/3600
+seconds = np.linspace(0,3600,100000)
+charges = CIC+dark*seconds
+plt.plot(seconds,charges)
+plt.plot(seconds,CIC*np.ones(len(seconds)))
+plt.xscale("log")
+# plt.yscale("log")
+plt.ylabel("Charges")
+plt.xlabel("time")
+
+plt.grid()
+plt.show()
+
+
+#%%
+
+CIC = 0.01
+dark = 0.1/3600
+seconds = np.linspace(0,600,100000)
+noise = np.sqrt(CIC**2+(dark*seconds)**2)
+plt.plot(seconds,noise)
+plt.plot(seconds,CIC*np.ones(len(seconds)))
+# plt.xscale("log")
+# plt.yscale("log")
+
+plt.ylabel("noise")
+plt.xlabel("time")
+plt.grid()
+plt.show()
+
+
+#%%
+
+from scipy.integrate import quad
+import numpy as np
+
+# Define the exponentiated function
+def exp_func(x, a):
+    return np.exp(-x/a)
+
+# Integrate the function from 0 to infinity for different values of a
+a_values = [0.5, 1.5,2,5]  # Example values of a, one less than 1 and other greater than 1
+
+for a in a_values:
+    result, error = quad(exp_func, 0, np.inf, args=(a,))
+    print(f"The integral of exp(-x/{a}) from 0 to infinity is approximately {result} (Error estimate: {error})")
+#%%
+
 from astropy.table import Table
 import warnings
 warnings.filterwarnings("ignore")
@@ -161,7 +256,7 @@ class Observation:
         else:
             self.flux_fraction_slit = 1
         # if self.smearing>0:
-        # self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
+        self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
         self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
         self.PSF_lambda_pix = self.wavelength / self.Spectral_resolution / self.dispersion
 
@@ -186,7 +281,7 @@ class Observation:
         # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
         # TODO use astropy.unit
-        if (self.counting_mode) & (self.self.EM_gain >1) :
+        if self.counting_mode:
             self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
             self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
@@ -353,207 +448,6 @@ class Observation:
         return fig 
 
     
-    def compute_optimal_threshold(self,flux = 0.1,dark_cic_sky_noise=None,plot_=False,title='',i=0,axes=None,size= (int(1e3),int(1e3)),size_bin=25, threshold=-1000):
-        """ 
-        Create a ADU value histogram and defin the threshold so that it gives the optimal SNR based on RN, smearing, noise, flux, gain
-        Function is pretty slow so output of this function has been saved and can then directly be used with interpolation (see function interpolate_optimal_threshold)
-        """
-        #self.Signal_el if np.isscalar(self.Signal_el) else 0.3
-        EM_gain = self.EM_gain if np.isscalar(self.EM_gain) else self.EM_gain[i]#1000
-        RN = self.RN if np.isscalar(self.RN) else self.RN[i]#80
-        CIC_noise = self.CIC_noise if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
-        dark_noise = self.Dark_current_noise if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
-        try:
-            Sky_noise = self.Sky_noise_pre_thresholding if np.isscalar(self.Sky_noise_pre_thresholding) else self.Sky_noise_pre_thresholding[i]
-        except AttributeError:
-            raise AttributeError('You must use counting_mode=True to use compute_optimal_threshold method.')
-
-        im = np.random.poisson(flux, size=size)
-        values,bins = np.histogram(im,bins=[-0.5,0.5,1.5,2.5])
-        ConversionGain=1#/4.5
-        imaADU = np.random.gamma(im, EM_gain) *ConversionGain
-        bins = np.arange(np.min(imaADU)-5*RN*ConversionGain,np.max(imaADU)+5*RN*ConversionGain,25)
-        # bins = np.linspace(-500,10000,400)
-        #imaADU = (np.random.gamma(im, EM_gain) + np.random.normal(0, RN, size=size))*ConversionGain
-        imaADU_copy = imaADU.copy()
-        imaADU_copy += np.random.normal(0, RN, size=size)*ConversionGain
-
-        if plot_:
-            if axes is None:
-                fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,figsize=(12, 7))#,figsize=(9,5))
-            else:
-                fig=0
-                ax1, ax2 = axes
-                ax1.clear()
-                ax2.clear()
-            val0,_,l0 = ax1.hist(imaADU_copy[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k',label='Before ampl & smearing')
-            val1,_,l1 = ax1.hist(imaADU_copy[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k')
-            val2,_,l2 = ax1.hist(imaADU_copy[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
-            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
-            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
-            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
-
-
-        if self.smearing > 0:
-            # print(SmearExpDecrement)
-            smearing_kernels = variable_smearing_kernels(
-                imaADU, self.smearing, SmearExpDecrement=5e4)
-            offsets = np.arange(6)
-            A = dia_matrix(
-                (smearing_kernels.reshape((6, -1)), offsets),
-                shape=(imaADU.size, imaADU.size))
-
-            imaADU = A.dot(imaADU.ravel()).reshape(imaADU.shape)
-        imaADU += np.random.normal(0, RN, size=size)*ConversionGain
-
-        if 1==0:
-            b = (bins[:-1]+bins[1:])/2
-            rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
-            rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
-            # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
-            signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
-            signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
-
-            pc = np.ones(len(b))# 
-                # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-            pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-
-            if dark_cic_sky_noise is None:
-                noise = CIC_noise**2+dark_noise**2+Sky_noise**2
-            else:
-                noise = dark_cic_sky_noise
-            # print('noises = ',noise)
-            SNR1 = pc*signal1/np.sqrt(signal1+noise)#+np.array(rn_noise)**2
-            SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
-            SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
-            # print('SNR_analogic = ',SNR_analogic)
-            threshold_55 = 5.5*RN*ConversionGain
-            id_55 =  np.argmin(abs(threshold_55 - b))
-            # if threshold<-5:
-            #     id_t = np.nanargmax(SNR1)
-            #     threshold = b[id_t]
-            # else:
-            #     threshold *= RN*ConversionGain
-            #     id_t = np.argmin(abs(threshold - b))
-            # # print(threshold)
-            # fraction_signal = np.sum(val1[id_t:])/np.sum(val1)
-            # fraction_rn = np.sum(val0[id_t:])/np.sum(val0)
-            lw=3
-            if plot_:
-                ax2.plot(b,rn_frac,lw=lw,ls=":",c="C0")#,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t])
-                ax2.plot(b,signal1/flux,lw=lw,ls=":",c="C1")#,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux)
-                # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
-                ax2.plot(b,pc,lw=lw,ls=":",c="C2")#,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t])
-                #ax2.plot(b,SNR1/pc,label='SNR without fraction')
-
-                # ax2.plot(b,SNR1/np.nanmax(SNR1),lw=lw,c="C4") # ,label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t])#'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
-                # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
-                ax2.plot(b,SNR1/SNR_analogic,lw=lw,ls=":",c="C3")#,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic)
-
-        if plot_:
-            val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,label='0',log=True)
-            val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,label='1',log=True)
-            val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,label='2',log=True)
-            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,label='3',log=True)
-            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,label='4',log=True)
-            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,label='5',log=True)
-            ax1.hist(imaADU.flatten(),bins=bins,label='Total histogram',log=True,histtype='step',lw=1,color='k')
-            # ax1.fill_between([bins[np.argmin(val0>val1)],bins[np.argmax(val0>val1)]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
-            # a0 = np.where(val0>val1)[0].max()
-            # a1 = np.where((val1>val2)&(val1>val0))[0].max()
-            # a2 = np.where((val2>val3)&(val2>val1))[0].max()
-            # a3 = np.where((val3>val4)&(val3>val2))[0].max()
-            # a4 = np.where((val4>val5)&(val4>val3))[0].max()
-            # ax1.fill_between([ bins[0],bins[a0]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
-            # ax1.fill_between([bins[a0],bins[a1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C1")
-            # ax1.fill_between([bins[a1],bins[a2]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C2")
-            # ax1.fill_between([bins[a2],bins[a3]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C3")
-            # ax1.fill_between([bins[a3],bins[a4]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C4")
-            # ax1.fill_between([bins[a4],bins[-1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C5")
-        else:
-            val0,_ = np.histogram(imaADU[im==0],bins=bins)#,alpha=0.5,label='0',log=True)
-            val1,_ = np.histogram(imaADU[im==1],bins=bins)#,alpha=0.5,label='1',log=True)
-            val2,_ = np.histogram(imaADU[im==2],bins=bins)#,alpha=0.5,label='2',log=True)
-            val3,_ = np.histogram(imaADU[im==3],bins=bins)
-            val4,_ = np.histogram(imaADU[im==4],bins=bins)
-            val5,_ = np.histogram(imaADU[im==5],bins=bins)
-
-        b = (bins[:-1]+bins[1:])/2
-        rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
-        rn_noise =  rn_frac * (RN/( ConversionGain)) # #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
-        # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
-        signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
-        signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
-
-        pc = np.ones(len(b))# 
-              # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-        pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
-
-        if dark_cic_sky_noise is None:
-            noise = CIC_noise**2+dark_noise**2+Sky_noise**2
-        else:
-            noise = dark_cic_sky_noise
-        # print('noises = ',noise)
-        SNR1 = signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)#
-        SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
-        SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
-        # print('SNR_analogic = ',SNR_analogic)
-        threshold_55 = 5.5*RN*ConversionGain
-        id_55 =  np.nanargmin(abs(threshold_55 - b))
-        if threshold<-5:
-            id_t = np.nanargmax(SNR1)
-            threshold = b[id_t]
-        else:
-            threshold *= RN*ConversionGain
-            id_t = np.nanargmin(abs(threshold - b))
-        # print(threshold)
-        fraction_signal = np.nansum(val1[id_t:])/np.nansum(val1)
-        fraction_rn = np.nansum(val0[id_t:])/np.nansum(val0)
-        lw=3
-        if plot_:
-            ax2.plot(b,rn_frac,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw,c="C0")
-            ax2.plot(b,signal1/flux,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux),lw=lw,c="C1")
-            # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
-            ax2.plot(b,pc,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t]),lw=lw,c="C2")
-            #ax2.plot(b,SNR1/pc,label='SNR without fraction')
-            # print(SNR1)
-            # print(SNR1/SNR1.max())
-            # ax2.plot(b,SNR1/np.nanmax(SNR1),label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t]),lw=lw,c="C4") #'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
-            # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
-
-
-
-            ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw,c="C3")
-            # ax2.plot(b,SNR12/SNR_analogic,':',label='SNR12 PC / SNR analogic',lw=lw)
-            # ax2.set_yscale('log')
-            ax2.set_ylim(ymin=1e-5)
-            
-            # ax2.plot(b,SNR1,label='[N1]/[N0] = %0.2f, frac(N1)=%i%%'%(val1[id_t]/val0[id_t],100*np.sum(val1[id_t:])/np.sum(val1)))
-            # ax2.plot(b,SNR12,label='[N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))))
-
-            ax2.legend(title = "T = 5.5σ ➛ %0.1fσ "%(threshold/(RN*ConversionGain)), fontsize=10)
-            ax2.set_xlabel('ADU')
-            ax1.set_ylabel('#')
-            ax2.set_ylabel('SNR')
-            ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k',label=r"SNR optimal threshold")
-            ax2.plot([threshold,threshold],[0,1],':',c='k')
-            ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k',label=r"5.5 $\sigma_{RN}$ threshold")
-            ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
-            L = ax1.legend(fontsize=10)
-            L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
-            L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
-            L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
-
-            ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(EM_gain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
-            ax1.set_xlim(xmin=bins.min(),xmax=5000)#bins.max())
-            # ax1.set_xlim(xmin=bins.min(),xmax=bins.max()/2)
-            if axes is None:
-                fig.tight_layout()
-            plt.show()
-            # return fig
-        # sys.exit()
-        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)
- 
 
 
     def interpolate_optimal_threshold(self,flux = 0.1,dark_cic_sky_noise=None,plot_=False,title='',i=0):
@@ -609,311 +503,227 @@ class Observation:
 
         return threshold, fraction_signal, fraction_rn, snr_ratio#np.nanmax(SNR1/SNR_analogic)
  
-
-
-
-    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=20, Altitude=35):
-        # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dard_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
-        from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
-        from scipy.sparse import dia_matrix
-        from scipy.interpolate import interp1d
-        for key in list(instruments["Charact."]) + ["Signal_el","N_images_true","Dark_current_f","sky"]:
-            if hasattr(self,key ):
-                if (type(getattr(self,key)) != float) & (type(getattr(self,key)) != int) &  (type(getattr(self,key)) != np.float64):
-                    setattr(self, key,getattr(self,key)[self.i])
-                    # print(getattr(self,key))
-                    # print(key, self.i)
-                    # print(getattr(self,key)[self.i])
-                    # a = getattr(self,key)[self.i]
-                    # print(a,self.setattr(key),)
-
-
-        conv_gain=conversion_gain
-        OS1, OS2 = OSregions
-        # ConversionGain=1
-        ConversionGain = conv_gain
-        Bias=0
-        image = np.zeros((size[1], size[0]), dtype="float64")
-        image_stack = np.zeros((size[1], size[0]), dtype="float64")
-
-        # self.Dard_current & flux
-        source_im = 0 * image[:, OSregions[0] : OSregions[1]]
-        source_im_wo_atm = 0 * image[:, OSregions[0] : OSregions[1]]
-        lx, ly = source_im.shape
-        y = np.linspace(0, lx - 1, lx)
-        x = np.linspace(0, ly - 1, ly)
-        x, y = np.meshgrid(x, y)
-
-        stack = int(self.N_images_true)
-        flux = (self.Signal_el /self.exposure_time)
-        Rx = self.PSF_RMS_det/self.pixel_scale
-        PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
-        PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
-                    
-        # nsize,nsize2 = size[1],size[0]
-        wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
-        # wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
-        nsize2, nsize = size
-        # nsize,nsize2 = 100,500
-        wavelengths = np.linspace(wave_min,wave_max,nsize2)
-        if "FIREBall" in self.instrument:
-            trans = Table.read("interpolate/transmission_pix_resolution.csv")
-            QE = Table.read("interpolate/QE_2022.csv")
-            QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
-            # print(trans["col2"],trans)
-            # trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(self.PSF_lambda_pix))/int(self.PSF_lambda_pix),mode="same")
-            trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(5))/int(5),mode="same")
-            # trans = trans[:-5]
-            atm_trans =  interp1d(list(trans["col1"]*10),list(trans["trans_conv"]))#
-            # print(wavelengths.min(),wavelengths.max(), trans["col1"].min(),trans["col1"].max())
-            QE = QE(wavelengths)  if QElambda else self.QE
-            atm_trans = atm_trans(wavelengths)   if (atmlambda & (Altitude<100) ) else self.Atmosphere
-        else:
-            trans = Table.read("interpolate/transmission_ground.csv")
-            atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
-            # print(wavelengths.min(),wavelengths.max(),(trans["wave_microns"]/1000).min(),(trans["wave_microns"]/1000).max())
-            atm_trans = atm_trans(wavelengths)  if (atmlambda & (Altitude<100) ) else self.Atmosphere
-            QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
-            # print(QE)
-        atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
-
-        length = self.Slitlength/2/self.pixel_scale
-        a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
-        b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
-
-
-        if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
-            if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
-                # print(PSF_x,PSF_λ)
-                # print(self.PSF_source,self.pixel_scale,self.PSF_RMS_det,self.pixel_scale)
-                with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
-                # print("QE",QE)
-                # print("atm_trans",atm_trans)
-                with_line *= atm_qe
-                # print(self.Signal_el ,self.exposure_time,flux,with_line)
-                # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-                # spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
-                # print( length, a, b, Rx )
-                # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
-                profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-                if np.isfinite(length) & ((a_ + b_).ptp()>0):
-                    # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
-                else:
-                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
-                # print(with_line,spatial_profile ,profile)
-                # print(self.PSF_source,self.pixel_scale,PSF_x)
-                # print(flux,with_line ,PSF_x)
-                source_im = source_im.T
-                source_im[:,:] += profile
-                source_im = source_im.T 
-
-
-
-            elif "mNUV=" in source:
-                #%%
-                mag=float(source.split("mNUV=")[-1])
-                factor_lya = fraction_lya
-                flux = 10**(-(mag-20.08)/2.5)*2.06*1E-16/((6.62E-34*300000000/(self.wavelength*0.0000000001)/0.0000001))
-                elec_pix = flux * self.Throughput  * self.Collecting_area*100*100 *self.dispersion  * trans * QE# * self.Atmosphere * self.QE # should not be multiplied by self.exposure_time time here
-                with_line = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2,PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ).sum()
-                # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
-                profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x) /Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, Rx).sum())
-                source_im = source_im.T
-                source_im[:,:] += profile
-                # source_im = source_im.T
-                # a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
-                # a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
-                # f = interp1d(a["WAVELENGTH"],a["e_pix_sec"])
-                # profile =   Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx).sum()
-                # subim = np.zeros((nsize2,nsize))
-                # wavelengths = np.linspace(2060-yi*dispersion,2060+(1000-yi)*dispersion,nsize2)
-                # source_im[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) * atm_trans(wavelengths) * self.QE(wavelengths)
-                # source_im_wo_atm[int(xi-nsize/2):int(xi+nsize/2), OSregions[0] : OSregions[1]] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-            else:
-                # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
-
-                # print(wave_min, wave_max)
-                if "_" not in source:
-                    flux_name,wave_name ="FLUX", "WAVELENGTH"
-                    fname = "h_%sfos_spc.fits"%(source.split(" ")[1])
-                    # print(fname)
-                    try:
-                        a = Table.read("Spectra/"+fname)
-                    except FileNotFoundError: 
-                        a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
-                        # slits = Table.read("/Users/Vincent/Github/FireBallPipe/Calibration/Targets/2022/" + field).to_pandas()
-                        # trans = Table.read("/Users/Vincent/Github/FIREBall_IMO/Python Package/FireBallIMO-1.0/FireBallIMO/transmission_pix_resolution.csv")
-                        # self.QE = Table.read("interpolate/QE_2022.csv")
-                    a["photons"] = a[flux_name]/9.93E-12   
-                    a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
-                elif "COSMOS" in source:
-                    a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[1]),format="ascii")
-                    wave_name,flux_name ="col1", "col2"
-                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
-                    a = a[mask]
-                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
-                elif "Salvato" in source:
-                    a = Table.read("Spectra/Salvato/%s.txt"%(source.split(" ")[1]),format="ascii")
-                    wave_name,flux_name ="col1", "col2"
-                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
-                    a = a[mask]
-                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
-                mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
-                slits = None #Table.read("Targets/2022/" + field).to_pandas()
-                source_im=np.zeros((nsize,nsize2))
-                source_im_wo_atm=np.zeros((nsize2,nsize))
-                f = interp1d(a[wave_name],a["e_pix_sec"])#
-                profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
-
-                if np.isfinite(length) & ( (a_ + b_).ptp()>0):
-                    # print(self.sky,self.exposure_time,a_,profile.shape)
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
-                else:
-                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
-
-                subim = np.zeros((nsize2,nsize))
-                source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
-
-
-                # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
-                if 1==0:
-                    fig,(ax0,ax1,ax2) = plt.subplots(3,1,sharex=True,figsize=(12,8))
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans,label="Atmosphere impact",alpha=0.3)
-                    ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans*QE,profile.max()* f(wavelengths) * atm_trans,label="self.QE impact",alpha=0.3)
-                    ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans/(f(wavelengths)* atm_trans).ptp(),label="Spectra * Atm")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans*QE/( f(wavelengths)* atm_trans*QE).ptp(),label="Spectra * Atm * self.QE")
-                    ax2.plot(wavelengths,atm_trans ,label="Atmosphere")
-                    ax2.plot(wavelengths,QE ,label="self.QE")
-                    ax0.legend()
-                    ax1.legend()
-                    ax2.legend()
-                    ax0.set_ylabel("e/pix/sec")
-                    ax1.set_ylabel("Normalized prof")
-                    ax2.set_ylabel("%")
-                    ax2.set_xlabel("wavelength")
-                    ax0.set_title(source)
-                    fig.tight_layout()
-                    fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source))
-                    # plt.show()
-        source_im = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 +  source_im  * int(self.exposure_time)
-        # print(self.Dark_current_f, self.extra_background , int(self.exposure_time)/3600 ,  source_im  , int(self.exposure_time))
-        source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
-        y_pix=1000
-        # print(len(source_im),source_im.shape)
-        self.long = False
-        if (self.readout_time/self.exposure_time > 0.2) & (self.long):
-            # print(source_im)
-            cube = np.array([(self.readout_time/self.exposure_time/y_pix)*np.vstack((np.zeros((i,len(source_im))),source_im[::-1,:][:-i,:]))[::-1,:] for i in np.arange(1,len(source_im))],dtype=float)
-            source_im = source_im+np.sum(cube,axis=0)
-        if self.cosmic_ray_loss_per_sec is None:
-            self.cosmic_ray_loss_per_sec = np.minimum(0.005*(self.exposure_time+self.readout_time/2),1)#+self.readout_time/2
-        # stack = np.max([int(stack * (1-self.cosmic_ray_loss_per_sec)),1])
-        stack = int(self.N_images_true)
-        cube_stack = -np.ones((stack,size[1], size[0]), dtype="int32")
-
-        # print(self.cosmic_ray_loss_per_sec)
-        n_smearing=6
-        # image[:, OSregions[0] : OSregions[1]] += source_im
-        # print(image[:, OSregions[0] : OSregions[1]].shape,source_im.shape)
-        if (self.EM_gain>1) & (self.CIC_charge>0):
-            image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
-        else:
-            # print(source_im)
-            image[:, OSregions[0] : OSregions[1]] += np.random.poisson(source_im)
-        # take into acount CR losses
-        #18%
-        # image_stack[:, OSregions[0] : OSregions[1]] = np.nanmean([np.where(np.random.rand(size[1], OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
-        if self.EM_gain>1:
-            image_stack[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
-        else:
-            # image_stack[:, OSregions[0] : OSregions[1]] = np.mean([np.random.poisson(source_im) for i in range(int(stack))],axis=0)
-            image_stack[:, OSregions[0] : OSregions[1]] = np.mean(np.random.poisson(np.repeat(source_im[:, :, np.newaxis], int(stack), axis=2)),axis=2)
-
-        # a = (np.where(np.random.rand(int(stack), size[1],OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype=int) , self.EM_gain))  for i in range(int(stack))]))
-        # Addition of the phyical image on the 2 overscan regions
-        #image += source_im2
-        if p_sCIC>0:
-            image +=  np.random.gamma( np.array(np.random.rand(size[1], size[0])<p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
-            #30%
-            image_stack += np.random.gamma( np.array(np.random.rand(size[1], size[0])<int(stack)*p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
-        if self.counting_mode:
-            a = np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype="int32") , self.EM_gain))  for i in range(int(stack))])
-            cube_stack[:,:, OSregions[0] : OSregions[1]] = a
-            cube_stack += np.random.gamma( np.array(np.random.rand(int(stack),size[1], size[0])<int(stack)*p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape)).astype("int32")
-            # print(cube_stack.shape)
-        #         # addition of pCIC (stil need to add sCIC before EM registers)
-        #         prob_pCIC = np.random.rand(size[1], size[0])  # Draw a number prob in [0,1]
-        #         image[prob_pCIC < self.CIC_charge] += 1
-        #         source_im2_stack[prob_pCIC < p_pCIC*stack] += 1
-
-        #         # EM amp (of source + self.Dard_current + pCIC)
-        #         id_nnul = image != 0
-        #         image[id_nnul] = np.random.gamma(image[id_nnul], self.EM_gain)
-                # Addition of sCIC inside EM registers (ie partially amplified)
-        #         prob_sCIC = np.random.rand(size[1], size[0])  # Draw a number prob in [0,1]
-        #         id_scic = prob_sCIC < p_sCIC  # sCIC positions
-        #         # partial amplification of sCIC
-        #         register = np.random.randint(1, n_registers, size=id_scic.sum())  # Draw at which stage of the EM register the electoself.RN is created
-        #         image[id_scic] += np.random.exponential(np.power(self.EM_gain, register / n_registers))
-            # semaring post EM amp (sgest noise reduction)
-            #TODO must add self.smearing for cube!
-        if self.smearing > 0:
-            # self.smearing dependant on flux
-            #2%
-            smearing_kernels = variable_smearing_kernels(image, self.smearing, SmearExpDecrement)
-            offsets = np.arange(n_smearing)
-            A = dia_matrix((smearing_kernels.reshape((n_smearing, -1)), offsets), shape=(image.size, image.size))
-
-            image = A.dot(image.ravel()).reshape(image.shape)
-            image_stack = A.dot(image_stack.ravel()).reshape(image_stack.shape)
-        #     if self.readout_time > 0:
-        #         # self.smearing dependant on flux
-        #         self.smearing_kernels = variable_smearing.smearing_keself.RNels(image.T, self.readout_time, SmearExpDecrement)#.swapaxes(1,2)
-        #         offsets = np.arange(n_smearing)
-        #         A = dia_matrix((self.smearing_kernels.reshape((n_smearing, -1)), offsets), shape=(image.size, image.size))#.swapaxes(0,1)
-        #         image = A.dot(image.ravel()).reshape(image.shape)#.T
-        #         image_stack = A.dot(image_stack.ravel()).reshape(image_stack.shape)#.T
-        type_ = "int32"
-        type_ = "float64"
-        readout = np.random.normal(Bias, self.RN, (size[1], size[0]))
-        readout_stack = np.random.normal(Bias, self.RN/np.sqrt(int(stack)), (size[1], size[0]))
-        if self.counting_mode:
-            readout_cube = np.random.normal(Bias, self.RN, (int(stack),size[1], size[0])).astype("int32")
-            # print((np.random.rand(source_im.shape[0], source_im.shape[1]) < self.cosmic_ray_loss_per_sec).mean())
-            #TOKEEP  for cosmic ray masking readout[np.random.rand(source_im.shape[0], source_im.shape[1]) < self.cosmic_ray_loss_per_sec]=np.nan
-            #print(np.max(((image + readout) * ConversionGain).round()))
-        #     if np.max(((image + readout) * ConversionGain).round()) > 2 ** 15:
-        imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
-        imaADU_RN = (readout * ConversionGain).round().astype(type_)
-        imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
-        # print(np.max(image_stack),np.max(readout_stack),ConversionGain,np.max(((image_stack + 1*readout_stack) * ConversionGain).round()))
-        # imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
-        imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).astype(type_)
-        # print(image_stack,readout_stack)
-        if self.counting_mode:
-            imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
-        else:
-            imaADU_cube = imaADU_stack
-        # print(imaADU_cube.shape)
-        imaADU[imaADU>Full_well*1000] = np.nan
-        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm#imaADU_wo_RN, imaADU_RN
-
-if __name__ == "__main__":
-    FB = Observation().SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
-
-
-
-# %load_ext line_profiler
-# %lprun -f Observation  Observation()#.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+    
  
-#%%
-# %lprun -u 1e-1 -T /tmp/initilize.py -s -r -f  Observation.initilize  Observation(exposure_time=np.linspace(50,1500,50))
-# %lprun -u 1e-1 -T /tmp/interpolate_optimal_threshold.py -s -r -f  Observation.interpolate_optimal_threshold  Observation(exposure_time=np.linspace(50,1500,50),counting_mode=True,plot_=False).interpolate_optimal_threshold()
-# %lprun -u 1e-1 -T /tmp/PlotNoise.py -s -r -f  Observation.PlotNoise  Observation(exposure_time=np.linspace(50,1500,50)).PlotNoise()
-# %lprun -u 1e-1 -T /tmp/SimulateFIREBallemCCDImage.py -s -r -f  Observation.SimulateFIREBallemCCDImage  Observation(exposure_time=np.linspace(50,1500,50)).SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
-# %%
+
+    def compute_optimal_threshold(self,flux = 0.1,dark_cic_sky_noise=None,plot_=False,title='',i=0,axes=None,size= (int(1e3),int(1e3)),size_bin=25, threshold=-1000):
+        """ 
+        Create a ADU value histogram and defin the threshold so that it gives the optimal SNR based on RN, smearing, noise, flux, gain
+        Function is pretty slow so output of this function has been saved and can then directly be used with interpolation (see function interpolate_optimal_threshold)
+        """
+        #self.Signal_el if np.isscalar(self.Signal_el) else 0.3
+        EM_gain = self.EM_gain if np.isscalar(self.EM_gain) else self.EM_gain[i]#1000
+        RN = self.RN if np.isscalar(self.RN) else self.RN[i]#80
+        CIC_noise = self.CIC_noise if np.isscalar(self.CIC_noise) else self.CIC_noise[i]
+        dark_noise = self.Dark_current_noise if np.isscalar(self.Dark_current_noise) else self.Dark_current_noise[i]
+        try:
+            Sky_noise = self.Sky_noise_pre_thresholding if np.isscalar(self.Sky_noise_pre_thresholding) else self.Sky_noise_pre_thresholding[i]
+        except AttributeError:
+            raise AttributeError('You must use counting_mode=True to use compute_optimal_threshold method.')
+
+        im = np.random.poisson(flux, size=size)
+        values,bins = np.histogram(im,bins=[-0.5,0.5,1.5,2.5])
+        ConversionGain=1#/4.5
+        imaADU = np.random.gamma(im, EM_gain) *ConversionGain
+        bins = np.arange(np.min(imaADU)-5*RN*ConversionGain,np.max(imaADU)+5*RN*ConversionGain,25)
+        # bins = np.linspace(-500,10000,400)
+        #imaADU = (np.random.gamma(im, EM_gain) + np.random.normal(0, RN, size=size))*ConversionGain
+        imaADU_copy = imaADU.copy()
+        imaADU_copy += np.random.normal(0, RN, size=size)*ConversionGain
+
+        if plot_:
+            if axes is None:
+                fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,figsize=(12, 7))#,figsize=(9,5))
+            else:
+                fig=0
+                ax1, ax2 = axes
+                ax1.clear()
+                ax2.clear()
+            val0,_,l0 = ax1.hist(imaADU_copy[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k',label='Before ampl & smearing')
+            val1,_,l1 = ax1.hist(imaADU_copy[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k')
+            val2,_,l2 = ax1.hist(imaADU_copy[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
 
 
+        if self.smearing > 0:
+            # print(SmearExpDecrement)
+            smearing_kernels = variable_smearing_kernels(
+                imaADU, self.smearing, SmearExpDecrement=5e4)
+            offsets = np.arange(6)
+            A = dia_matrix(
+                (smearing_kernels.reshape((6, -1)), offsets),
+                shape=(imaADU.size, imaADU.size))
+
+            imaADU = A.dot(imaADU.ravel()).reshape(imaADU.shape)
+        imaADU += np.random.normal(0, RN, size=size)*ConversionGain
+
+        if 1==1:
+            b = (bins[:-1]+bins[1:])/2
+            above_threshold =np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+            rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/  np.array([np.sum(val1[b>bi]) for bi in b])#   np.sum(val0) 
+            rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/  (np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b]))
+            rn_noise =  rn_frac #* (RN/( ConversionGain)) # #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
+            
+            signal1 = flux * above_threshold
+
+            pc = np.ones(len(b))# 
+                # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+            pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+
+            if dark_cic_sky_noise is None:
+                noise = (CIC_noise**2+dark_noise**2+Sky_noise**2 +flux)
+            else:
+                noise = (dark_cic_sky_noise**2 +flux)  
+            print('noises = ',noise)
+            denom = np.sqrt(noise* above_threshold*2+np.array(rn_noise)**2)#
+            SNR1 = signal1/denom
+            print('SNR1 = ',SNR1)
+            SNR12 = signal12/ denom
+            SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
+            # print('SNR_analogic = ',SNR_analogic)
+            threshold_55 = 5.5*RN*ConversionGain
+            id_55 =  np.argmin(abs(threshold_55 - b))
+            # if threshold<-5:
+            #     id_t = np.nanargmax(SNR1)
+            #     threshold = b[id_t]
+            # else:
+            #     threshold *= RN*ConversionGain
+            #     id_t = np.argmin(abs(threshold - b))
+            # # print(threshold)
+            # fraction_signal = np.sum(val1[id_t:])/np.sum(val1)
+            # fraction_rn = np.sum(val0[id_t:])/np.sum(val0)
+            lw=3
+            if plot_:
+                ax2.plot(b,rn_frac,lw=lw,ls=":",c="C0")#,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t])
+                ax2.plot(b,signal1/flux,lw=lw,ls=":",c="C1")#,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux)
+                # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
+                # ax2.plot(b,pc,lw=lw,ls=":",c="C2")#,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t])
+                #ax2.plot(b,SNR1/pc,label='SNR without fraction')
+
+                # ax2.plot(b,SNR1/np.nanmax(SNR1),lw=lw,c="C4") # ,label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t])#'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
+                # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
+                ax2.plot(b,SNR1/SNR_analogic,lw=lw,ls=":",c="C3")#,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic)
+
+        if plot_:
+            val0,_,l0 = ax1.hist(imaADU[im==0],bins=bins,alpha=0.5,label='0',log=True)
+            val1,_,l1 = ax1.hist(imaADU[im==1],bins=bins,alpha=0.5,label='1',log=True)
+            val2,_,l2 = ax1.hist(imaADU[im==2],bins=bins,alpha=0.5,label='2',log=True)
+            # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,label='3',log=True)
+            # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,label='4',log=True)
+            # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,label='5',log=True)
+            ax1.hist(imaADU.flatten(),bins=bins,label='Total histogram',log=True,histtype='step',lw=1,color='k')
+            # ax1.fill_between([bins[np.argmin(val0>val1)],bins[np.argmax(val0>val1)]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
+            # a0 = np.where(val0>val1)[0].max()
+            # a1 = np.where((val1>val2)&(val1>val0))[0].max()
+            # a2 = np.where((val2>val3)&(val2>val1))[0].max()
+            # a3 = np.where((val3>val4)&(val3>val2))[0].max()
+            # a4 = np.where((val4>val5)&(val4>val3))[0].max()
+            # ax1.fill_between([ bins[0],bins[a0]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C0")
+            # ax1.fill_between([bins[a0],bins[a1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C1")
+            # ax1.fill_between([bins[a1],bins[a2]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C2")
+            # ax1.fill_between([bins[a2],bins[a3]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C3")
+            # ax1.fill_between([bins[a3],bins[a4]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C4")
+            # ax1.fill_between([bins[a4],bins[-1]],[val0.max(),val0.max()],[1.2*val0.max(),1.2*val0.max()],alpha=0.3,color="C5")
+        else:
+            val0,_ = np.histogram(imaADU[im==0],bins=bins)#,alpha=0.5,label='0',log=True)
+            val1,_ = np.histogram(imaADU[im==1],bins=bins)#,alpha=0.5,label='1',log=True)
+            val2,_ = np.histogram(imaADU[im==2],bins=bins)#,alpha=0.5,label='2',log=True)
+            val3,_ = np.histogram(imaADU[im==3],bins=bins)
+            val4,_ = np.histogram(imaADU[im==4],bins=bins)
+            val5,_ = np.histogram(imaADU[im==5],bins=bins)
+
+        b = (bins[:-1]+bins[1:])/2
+        above_threshold =np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+        rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/  np.array([np.sum(val1[b>bi]) for bi in b])#   np.sum(val0) 
+        # rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/  (np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b]))
+        rn_noise =  rn_frac #* (RN/( ConversionGain)) # #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+        # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+        signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
+        
+        signal1 = flux * above_threshold
+
+        pc = np.ones(len(b))# 
+              # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+        pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+        ENF=2
+
+        if dark_cic_sky_noise is None:
+            noise = (CIC_noise**2+dark_noise**2+Sky_noise**2 +flux)
+        else:
+            noise = (dark_cic_sky_noise**2 +flux)  
+        print('noises = ',noise)
+        denom = np.sqrt(noise* above_threshold*1+np.array(rn_noise)**2)#
+        SNR1 = signal1/denom
+        print('SNR1 = ',SNR1)
+        SNR12 = signal12/ denom
+        SNR_analogic = flux/np.sqrt(ENF*flux+ENF*noise+(RN/(EM_gain * ConversionGain))**2)
+        # print('SNR_analogic = ',SNR_analogic)
+        threshold_55 = 5.5*RN*ConversionGain
+        id_55 =  np.nanargmin(abs(threshold_55 - b))
+        if threshold<-5:
+            id_t = np.nanargmax(SNR1)
+            threshold = b[id_t]
+        else:
+            threshold *= RN*ConversionGain
+            id_t = np.nanargmin(abs(threshold - b))
+        # print(threshold)
+        fraction_signal = np.nansum(val1[id_t:])/np.nansum(val1)
+        fraction_rn = np.nansum(val0[id_t:])/np.nansum(val0)
+        lw=3
+        if plot_:
+            ax2.plot(b,rn_frac,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw,c="C0")
+            # ax2.plot(b,denom,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t]),lw=lw,c="C0")
+            ax2.plot(b,signal1/flux,label='Signal(Signal>T):  %0.1f%% ➛ %0.1f%%'%(100*signal1[id_55]/flux,100*signal1[id_t]/flux),lw=lw,c="C1")
+            # ax2.plot(b,pc,label='Fraction(T) of true positive: %0.1f%% ➛ %0.1f%%'%(100*pc[id_55],100*pc[id_t]),lw=lw,c="C2")
+            ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw,c="C3")
+            # ax2.plot(b,SNR12/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw,c="C3")
+            ax2.axhline(y=1.41,ls=":",c="k")
+            # ax2.plot(b,signal1/denom,label="signal1/denom",lw=lw,c="C4")
+            # ax2.plot(b,signal12/denom,label="signal1/denom",lw=lw,c="C4")
+            # ax2.plot(b,SNR1/SNR_analogic,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic),lw=lw,c="C3")
+            # ax2.plot(b,np.array(rn_noise)**2,label='(RN(RN>T)/EM_gain)**2',lw=lw)
+            #ax2.plot(b,SNR1/pc,label='SNR without fraction')
+            # print(SNR1)
+            # print(SNR1/SNR1.max())
+            # ax2.plot(b,SNR1/np.nanmax(SNR1),label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t]),lw=lw,c="C4") #'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
+            # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
+
+
+
+            # ax2.plot(b,SNR12/SNR_analogic,':',label='SNR12 PC / SNR analogic',lw=lw)
+            # ax2.set_yscale('log')
+            ax2.set_ylim(ymin=1e-5)
+            
+            # ax2.plot(b,SNR1,label='[N1]/[N0] = %0.2f, frac(N1)=%i%%'%(val1[id_t]/val0[id_t],100*np.sum(val1[id_t:])/np.sum(val1)))
+            # ax2.plot(b,SNR12,label='[N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))))
+
+            ax2.legend(title = "T = 5.5σ ➛ %0.1fσ "%(threshold/(RN*ConversionGain)), fontsize=10)
+            ax2.set_xlabel('ADU')
+            ax1.set_ylabel('#')
+            ax2.set_ylabel('SNR')
+            ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k',label=r"SNR optimal threshold")
+            ax2.plot([threshold,threshold],[0,1],':',c='k')
+            ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k',label=r"5.5 $\sigma_{RN}$ threshold")
+            ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
+            L = ax1.legend(fontsize=10)
+            L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
+            L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
+            L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
+
+            ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(EM_gain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
+            ax1.set_xlim(xmin=bins.min(),xmax=5000)#bins.max())
+            # ax1.set_xlim(xmin=bins.min(),xmax=bins.max()/2)
+            ax2.set_yscale("symlog")
+            if axes is None:
+                fig.tight_layout()
+            plt.show()
+            # return fig
+        # sys.exit()
+        return threshold/(RN*ConversionGain), fraction_signal, fraction_rn, np.nanmax(SNR1/SNR_analogic)
+    
+
+Observation(exposure_time=np.linspace(50,1500,50),RN=40,smearing=1.5,counting_mode=True,plot_=False).compute_optimal_threshold(plot_=True,flux=0.1,dark_cic_sky_noise=1,size= (int(3e2),int(1e3)))
