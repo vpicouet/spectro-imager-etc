@@ -244,7 +244,7 @@ class Observation:
                 setattr(self, name, getattr(self,name)*np.ones(n))
         self.factor = self.factor*np.ones(n) if type(self.factor)== np.float64 else self.factor
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
-        self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  self.RN_final, self.CIC_charge, self.Additional_background]).T
+        self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  0*self.RN_final, self.CIC_charge, self.Additional_background]).T
         self.names = ["Signal","Dark current", "Sky", "Read noise","CIC", "Extra background"]
         self.snrs=self.Signal_resolution /self.Total_noise_final
 
