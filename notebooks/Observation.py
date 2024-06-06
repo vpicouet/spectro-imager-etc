@@ -368,7 +368,11 @@ class Observation:
         except AttributeError:
             raise AttributeError('You must use counting_mode=True to use compute_optimal_threshold method.')
 
-        im = np.random.poisson(flux, size=size)
+
+        dark = dark_noise**2
+        CIC = CIC_noise**2
+        sky = Sky_noise**2
+        im = np.random.poisson(flux+dark+CIC+sky, size=size)
         values,bins = np.histogram(im,bins=[-0.5,0.5,1.5,2.5])
         ConversionGain=1#/4.5
         imaADU = np.random.gamma(im, EM_gain) *ConversionGain
@@ -389,6 +393,7 @@ class Observation:
             val0,_,l0 = ax1.hist(imaADU_copy[im==0],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k',label='Before ampl & smearing')
             val1,_,l1 = ax1.hist(imaADU_copy[im==1],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.7,color='k')
             val2,_,l2 = ax1.hist(imaADU_copy[im==2],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
+            # _,_,_ = ax1.hist(imaADU_copy.flatten(),bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
             # val3,_,l3 = ax1.hist(imaADU[im==3],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
             # val4,_,l4 = ax1.hist(imaADU[im==4],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
             # val5,_,l5 = ax1.hist(imaADU[im==5],bins=bins,alpha=0.5,log=True,histtype='step',lw=0.5,color='k')
@@ -406,38 +411,54 @@ class Observation:
             imaADU = A.dot(imaADU.ravel()).reshape(imaADU.shape)
         imaADU += np.random.normal(0, RN, size=size)*ConversionGain
 
-        if 1==0:
+        if 1==1:
             b = (bins[:-1]+bins[1:])/2
             rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
             rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
             # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
             signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
-            signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
-
-            pc = np.ones(len(b))# 
-                # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+            kept = np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+            signal1 = flux * kept
+            pc = np.ones(len(b))#                 # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
             pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
 
             if dark_cic_sky_noise is None:
                 noise = CIC_noise**2+dark_noise**2+Sky_noise**2
             else:
                 noise = dark_cic_sky_noise
-            # print('noises = ',noise)
-            SNR1 = pc*signal1/np.sqrt(signal1+noise)#+np.array(rn_noise)**2
+            # SNR1 = signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)#
+            SNR1 = signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)**2   )#
+
             SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
             SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
-            # print('SNR_analogic = ',SNR_analogic)
             threshold_55 = 5.5*RN*ConversionGain
             id_55 =  np.argmin(abs(threshold_55 - b))
-            # if threshold<-5:
-            #     id_t = np.nanargmax(SNR1)
-            #     threshold = b[id_t]
+            # b = (bins[:-1]+bins[1:])/2
+            # rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
+            # rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            # # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+            # signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
+            # kept = np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+            # signal1 = flux * kept
+
+            # pc = np.ones(len(b))# 
+            #     # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+            # pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
+
+            # if dark_cic_sky_noise is None:
+            #     noise = np.sqrt(CIC_noise**2+dark_noise**2+Sky_noise**2)
+            #     # noise = np.sqrt(CIC_noise+dark_noise+Sky_noise)
             # else:
-            #     threshold *= RN*ConversionGain
-            #     id_t = np.argmin(abs(threshold - b))
-            # # print(threshold)
-            # fraction_signal = np.sum(val1[id_t:])/np.sum(val1)
-            # fraction_rn = np.sum(val0[id_t:])/np.sum(val0)
+            #     noise = dark_cic_sky_noise
+            # # noise = np.sqrt(noise)
+            # # print('noises = ',noise)
+            # print("signal + dark + cic + Sky + rn = 1      :", "%0.2f + %0.2f+ %0.2f+%0.2f+%0.2f=%0.2f"%(flux,dark,CIC,sky,np.sum(val0)/np.sum(val0+val1+val2),  flux+dark+CIC+sky+np.sum(val0)/np.sum(val0+val1+val2)    ))
+            # SNR1 = signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)#
+            # # SNR1 = signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)   )#
+            # SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
+            # SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
+            # print('SNR_analogic = ',SNR_analogic)
+
             lw=3
             if plot_:
                 ax2.plot(b,rn_frac,lw=lw,ls=":",c="C0")#,label='RN(RN>T):  %0.2f%% ➛ %0.2f%%'%(100*rn_frac[id_55],100*rn_frac[id_t])
@@ -478,27 +499,34 @@ class Observation:
             val4,_ = np.histogram(imaADU[im==4],bins=bins)
             val5,_ = np.histogram(imaADU[im==5],bins=bins)
 
+
+
         b = (bins[:-1]+bins[1:])/2
         rn_frac = np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) 
-        rn_noise =  rn_frac * (RN/( ConversionGain)) # #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
+        rn_noise = (RN/(EM_gain * ConversionGain)) * rn_frac #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
         # rn_noise = RN * np.array([np.sum(val0[b>bi]) for bi in b])/np.sum(val0) #/(EM_gain*ConversionGain)#/(EM_gain*ConversionGain)
         signal12 = flux * np.array([np.sum(val1[b>bi])+np.sum(val2[b>bi]) for bi in b])/(np.sum(val1)+np.sum(val2))
-        signal1 = flux * np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+        kept = np.array([np.sum(val1[b>bi]) for bi in b])/np.sum(val1)
+        signal1 = flux * kept
 
         pc = np.ones(len(b))# 
               # ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
         pc =  ([np.sum(val1[b>bi])for bi in b]/(np.array([np.sum(val1[b>bi])for bi in b])+np.array([np.sum(val0[b>bi]) for bi in b])))
 
         if dark_cic_sky_noise is None:
-            noise = CIC_noise**2+dark_noise**2+Sky_noise**2
+            noise = np.sqrt(CIC_noise**2+dark_noise**2+Sky_noise**2)
+            # noise = np.sqrt(CIC_noise+dark_noise+Sky_noise)
         else:
             noise = dark_cic_sky_noise
+        # noise = np.sqrt(noise)
         # print('noises = ',noise)
-        SNR1 = signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)#
+        print("signal + dark + cic + Sky + rn = 1      :", "%0.2f + %0.2f+ %0.2f+%0.2f+%0.2f=%0.2f"%(flux,dark,CIC,sky,np.sum(val0)/np.sum(val0+val1+val2),  flux+dark+CIC+sky+np.sum(val0)/np.sum(val0+val1+val2)    ))
+        # SNR1 = signal1 / np.sqrt(signal1+noise+np.array(rn_noise)**2)#
+        SNR1 = signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)   )  /2#
         SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
         SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
-        # print('SNR_analogic = ',SNR_analogic)
-        threshold_55 = 5.5*RN*ConversionGain
+        print('SNR_analogic = ',SNR_analogic)
+        threshold_55 = 5.5 * RN * ConversionGain
         id_55 =  np.nanargmin(abs(threshold_55 - b))
         if threshold<-5:
             id_t = np.nanargmax(SNR1)
@@ -532,17 +560,27 @@ class Observation:
             # ax2.plot(b,SNR12,label='[N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))))
 
             ax2.legend(title = "T = 5.5σ ➛ %0.1fσ "%(threshold/(RN*ConversionGain)), fontsize=10)
-            ax2.set_xlabel('ADU')
-            ax1.set_ylabel('#')
-            ax2.set_ylabel('SNR')
+            ax2.legend(title = "T = 5.5σ ➛ %0.1fσ "%(threshold/(RN*ConversionGain)), fontsize=13)
+            ax2.set_xlabel('ADU',fontsize=13)
+            ax1.set_ylabel('Occurence',fontsize=13)
+            ax2.set_ylabel('SNR',fontsize=13)
             ax1.plot([threshold,threshold],[0,np.max(val0)],':',c='k',label=r"SNR optimal threshold")
             ax2.plot([threshold,threshold],[0,1],':',c='k')
             ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k',label=r"5.5 $\sigma_{RN}$ threshold")
             ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
             L = ax1.legend(fontsize=10)
-            L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
-            L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
-            L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
+            L = ax1.legend(fontsize=13)
+            # L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
+            # L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
+            # L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
+
+            L.get_texts()[1].set_text('0 e$^-$ : %0.1f%% of pixels'%(100*values[0]/(size[0]*size[1])))
+            L.get_texts()[2].set_text('1 e$^-$ : %0.1f%% of pixels'%(100*values[1]/(size[0]*size[1])))
+            L.get_texts()[3].set_text('2 e$^-$ : %0.1f%% of pixels'%(100*values[2]/(size[0]*size[1])))
+
+            ax1.tick_params(axis='both',labelsize=12)
+            ax2.tick_params(axis='both',labelsize=12)
+
 
             ax1.set_title(title+'Gain = %i, RN = %i, flux = %0.2f, smearing=%0.1f, Threshold = %i = %0.2f$\sigma$'%(EM_gain,RN,flux,self.smearing, threshold,threshold/(RN*ConversionGain)))
             ax1.set_xlim(xmin=bins.min(),xmax=5000)#bins.max())
