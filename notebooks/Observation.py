@@ -131,7 +131,7 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=0.50,i=25,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=100,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=1.50,i=33,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=160,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
@@ -141,19 +141,19 @@ class Observation:
     def initilize(self):
         self.precise = True
         self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=4,theta=0)(self.Δx,self.Δλ)
-        # print("\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",Sky, "\nacquisition_time=",acquisition_time,"\ncounting_mode=",counting_mode,"\nSignal=",Signal,"\nEM_gain=",EM_gain,"RN=",RN,"CIC_charge=",CIC_charge,"Dard_current=",Dard_current,"\nreadout_time=",readout_time,"\n_smearing=",smearing,"\nextra_background=",extra_background,"\ntemperature=",temperature,"\nPSF_RMS_mask=",PSF_RMS_mask,"\nPSF_RMS_det=",PSF_RMS_det,"\nQE=",QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
-        # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",Δλ, "\napixel_scale=",pixel_scale,"\nSpectral_resolution=",Spectral_resolution,"\ndispersion=",dispersion,"\nLine_width=",Line_width,"wavelength=",wavelength,"pixel_size=",pixel_size)
+        # print("\ni",self.i,"\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",self.Sky, "\nacquisition_time=",self.acquisition_time,"\ncounting_mode=",self.counting_mode,"\nSignal=",self.Signal,"\nEM_gain=",self.EM_gain,"RN=",self.RN,"CIC_charge=",self.CIC_charge,"Dard_current=",self.Dard_current,"\nreadout_time=",self.readout_time,"\nsmearing=",self.smearing,"\nextra_background=",self.extra_background,"\nPSF_RMS_mask=",self.PSF_RMS_mask,"\nPSF_RMS_det=",self.PSF_RMS_det,"\nQE=",self.QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
+        # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",self.Δλ, "\napixel_scale=",self.pixel_scale,"\nSpectral_resolution=",self.Spectral_resolution,"\ndispersion=",self.dispersion,"\nLine_width=",self.Line_width,"wavelength=",self.wavelength,"pixel_size=",self.pixel_size)
         # Simple hack to me able to use UV magnitudes (not used for the ETC)
         if np.max([self.Signal])>1:
             self.Signal = 10**(-(self.Signal-20.08)/2.5)*2.06*1E-16
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
-        if self.precise:
+        if self.precise: # TBV are we sure we should do that here?
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
             # self.spectro_resolution_A = self.wavelength * self.spectral
             self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
-
+            # print("Factor spatial and spectral",  (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) ),   (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) ))
 
         if ~np.isnan(self.Slitwidth).all() & self.precise:
             # assess flux fraction going through slit
@@ -186,8 +186,9 @@ class Observation:
         # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength) 
         # self.Collecting_area *= 100 * 100#m2 to cm2
         # TODO use astropy.unit
-        if (self.counting_mode) & (self.EM_gain >1) :
-            self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
+        if (self.counting_mode) : #& (self.EM_gain>=1)  Normaly if counting mode is on EM_gain is >1
+            # self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
+            self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str  * self.dispersion
             self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             self.signal_pre_thresholding = self.Signal*self.factor_CU2el*self.exposure_time  # el/pix/frame
@@ -195,6 +196,9 @@ class Observation:
             # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i,flux=self.signal_pre_thresholding)
         else:
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(self.len_xaxis),np.ones(self.len_xaxis),np.ones(self.len_xaxis), np.zeros(self.len_xaxis)
+        
+        
+        
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
@@ -203,11 +207,14 @@ class Observation:
         if np.isnan(self.Slitwidth).all():
             # If instrument is not a spectro?
             self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str *self.pixel_scale**2 #but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+            self.factor_CU2el_sky = self.factor_CU2el
         else:
-            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+            # self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+            self.factor_CU2el_sky = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
         
 
-        self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
+        self.sky = self.Sky_CU*self.factor_CU2el_sky*self.exposure_time  # el/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
             
         # TODO in counting mode, Photon_fraction_kept should also be used for CIC
@@ -255,13 +262,26 @@ class Observation:
         
         self.el_per_pix = self.Signal_el + self.sky + self.CIC_charge +  self.Dark_current_f
         n_sigma = 5
-        self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma**2 * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
-        self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution
-        self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu
+        self.signal_nsig_e_resol_nframe = (n_sigma**2 * self.ENF + n_sigma * np.sqrt(4*self.Total_noise_final**2 - 4*self.signal_noise_nframe**2 + self.ENF**2*n_sigma**2))/2
+        # self.signal_nsig_e_resol_nframe = 457*np.ones(self.len_xaxis)
+        self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution #TBV
+        self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu #TBV
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
-        self.extended_source_5s = self.signal_nsig_ergs * (self.pixel_scale*self.PSF_RMS_det)**2
+        self.extended_source_5s = self.signal_nsig_ergs * (self.PSF_RMS_det*2.35)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.snrs)
+        # print(self.acquisition_time, self.exposure_time[self.i] , self.readout_time)
+        # print(self.N_images_true[self.i], self.N_images[self.i] , self.cosmic_ray_loss[self.i])
+        
+        # print("E2E troughput",int((100*self.QE_efficiency * self.Throughput * self.Atmosphere)[self.i]) , "\nFrame number=",self.N_images_true[self.i],"\nResolElem=",self.resolution_element, "\nSignal=",self.Signal_resolution[self.i])
+
+        # print("Sigma=5")
+        # print("Flux (e/rsol/Nframe), σ==5 :",self.signal_nsig_e_resol_nframe[self.i])
+        # print("Flux LU, σ==5 : %0.1E"%(self.signal_nsig_LU[self.i]))
+        # print("Flux	erg/cm2/s/''2/Å :",self.signal_nsig_ergs[self.i])
+        # print("Flux	overPSF :",self.extended_source_5s[self.i])
+        # print("Flux	point source :",self.point_source_5s[self.i])
+
         # print("factor=",self.factor[self.i])
         # print("N_images_true=",np.sqrt(self.N_images_true)[self.i] )
         # print("resolution_element=", self.resolution_element)
