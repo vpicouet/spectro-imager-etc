@@ -755,9 +755,9 @@ class Observation:
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-                if np.isfinite(length) & ((a_ + b_).ptp()>0):
+                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) )
                 else:
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
                 # print(with_line,spatial_profile ,profile)
@@ -825,9 +825,9 @@ class Observation:
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
                 profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
 
-                if np.isfinite(length) & ( (a_ + b_).ptp()>0):
+                if np.isfinite(length) & ( np.ptp(a_ + b_)>0):
                     # print(self.sky,self.exposure_time,a_,profile.shape)
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / (a_ + b_).ptp() )
+                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
                 else:
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
 
@@ -840,9 +840,9 @@ class Observation:
                     fig,(ax0,ax1,ax2) = plt.subplots(3,1,sharex=True,figsize=(12,8))
                     ax0.fill_between(wavelengths, profile.max()*f(wavelengths),profile.max()* f(wavelengths) * atm_trans,label="Atmosphere impact",alpha=0.3)
                     ax0.fill_between(wavelengths, profile.max()*f(wavelengths)* atm_trans*QE,profile.max()* f(wavelengths) * atm_trans,label="self.QE impact",alpha=0.3)
-                    ax1.plot(wavelengths,f(wavelengths)/f(wavelengths).ptp(),label="Spectra")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans/(f(wavelengths)* atm_trans).ptp(),label="Spectra * Atm")
-                    ax1.plot(wavelengths, f(wavelengths)* atm_trans*QE/( f(wavelengths)* atm_trans*QE).ptp(),label="Spectra * Atm * self.QE")
+                    ax1.plot(wavelengths,f(wavelengths)/np.ptp(f(wavelengths)),label="Spectra")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans/np.ptp(f(wavelengths)* atm_trans),label="Spectra * Atm")
+                    ax1.plot(wavelengths, f(wavelengths)* atm_trans*QE/np.ptp( f(wavelengths)* atm_trans*QE),label="Spectra * Atm * self.QE")
                     ax2.plot(wavelengths,atm_trans ,label="Atmosphere")
                     ax2.plot(wavelengths,QE ,label="self.QE")
                     ax0.legend()

@@ -61,7 +61,7 @@ Then, both contributions are converted similarly into electrons per pixels:
 
 $$Sky_{e-/pix/exp} = Sky_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix}  \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
 
-$$Signal_{e-/pix/exp} = Signal_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix} \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
+$$Signal_{e-/pix/exp} = Signal_{CU} \times min(Slitwidth_{str},SourceSize_{str})  \times Dispersion_{Å/pix} \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
 
 <!-- If the instrument is an imager (no slit and no dispersion), we replace the factor $ Slitwidth_{str}  \times Dispersion_{Å/pix}$ by $FOV_{str} \times Bandwidth_{Å} $. -->
 
