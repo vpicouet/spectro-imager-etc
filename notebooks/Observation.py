@@ -694,6 +694,7 @@ class Observation:
         ConversionGain = conv_gain
         Bias=0
         image = np.zeros((size[1], size[0]), dtype="float64")
+        image_without_source = np.zeros((size[1], size[0]), dtype="float64")
         image_stack = np.zeros((size[1], size[0]), dtype="float64")
         image_stack_only_source = np.zeros((size[1], size[0]), dtype="float64")
 
@@ -863,7 +864,9 @@ class Observation:
                     fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source))
                     # plt.show()
         source_im_only_source =  source_im  * int(self.exposure_time)
-        source_im = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 +  source_im  * int(self.exposure_time)
+        source_background = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 
+        source_im =  source_background +  source_im  * int(self.exposure_time)
+
         source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
         y_pix=1000
         self.long = False
@@ -878,9 +881,12 @@ class Observation:
         n_smearing=6
         if (self.EM_gain>1) & (self.CIC_charge>0):
             image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
+            image_without_source[:, OSregions[0] : OSregions[1]] +=  np.random.gamma( np.random.poisson(source_background) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
         else:
             # print(source_im)
             image[:, OSregions[0] : OSregions[1]] += np.random.poisson(source_im)
+            image_without_source[:, OSregions[0] : OSregions[1]] +=  np.random.poisson(source_background)
+            
         # take into acount CR losses
         #18%
         # image_stack[:, OSregions[0] : OSregions[1]] = np.nanmean([np.where(np.random.rand(size[1], OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
@@ -951,6 +957,7 @@ class Observation:
         imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
         imaADU_RN = (readout * ConversionGain).round().astype(type_)
         imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
+        imaADU_background = ((image_without_source + 1*readout) * ConversionGain).round().astype(type_)
         # print(np.max(image_stack),np.max(readout_stack),ConversionGain,np.max(((image_stack + 1*readout_stack) * ConversionGain).round()))
         # imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
         imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).astype(type_)
@@ -961,14 +968,14 @@ class Observation:
             imaADU_cube = imaADU_stack
         imaADU[imaADU>Full_well*1000] = np.nan
         # print(np.ptp(imaADU_stack), np.ptp(imaADU_stack_only_source))
-        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source#imaADU_wo_RN, imaADU_RN
+        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background#imaADU_wo_RN, imaADU_RN
         # TODO to be sure that we can add things for the IFS cube we need to return the dark+sky+readnoise and the source image somewhere
         # but on what part do you do the photon counting thing? on both?
         # ishould just use it using self maybe?
 
 
 if __name__ == "__main__":
-    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source = Observation().SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background = Observation().SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
 
 
 
