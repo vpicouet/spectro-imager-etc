@@ -888,9 +888,6 @@ class Observation:
         source_im_only_source =  source_im  * int(self.exposure_time)
         source_background = sky_im  * int(self.exposure_time) + self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 
         source_im =  source_background +  source_im_only_source
-        print("source_im_only_source : ",source_im_only_source.shape)
-        print("source_background : ",source_background.shape)
-        print("source_im : ",source_im.shape)
         source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
         y_pix=1000
         self.long = False
