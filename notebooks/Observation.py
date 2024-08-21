@@ -748,8 +748,8 @@ class Observation:
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
 
         #TODO these 2 lines generate some issues when self.Slitlength>nsize
-        length = min(self.Slitlength/2/self.pixel_scale,nsize/2-1)
-        # length = self.Slitlength/2/self.pixel_scale
+        # length = min(self.Slitlength/2/self.pixel_scale,nsize/2-1)
+        length = self.Slitlength/2/self.pixel_scale
         a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         # print(self.Slitlength,length, nsize,  Rx)
@@ -773,7 +773,10 @@ class Observation:
                 if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                     # print(1)
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) )
+                    if self.Slitlength/self.pixel_scale<nsize:
+                        profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) )
+                    else:
+                        profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * np.ones(nsize) / nsize )
                 else:
                     # print(2)
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
@@ -849,6 +852,7 @@ class Observation:
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
 
                 subim = np.zeros((nsize2,nsize))
+                #TODO this does not work when spectra because the ValueError: A value (4360.0) in x_new is above the interpolation range's maximum value (3277.23291015625).
                 source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
 
 
