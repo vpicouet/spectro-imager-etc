@@ -164,7 +164,7 @@ class Observation:
         # if self.smearing>0:
         # self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
         self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
-        self.PSF_lambda_pix = self.wavelength / self.Spectral_resolution / self.dispersion
+        self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
@@ -711,7 +711,8 @@ class Observation:
         Rx = self.PSF_RMS_det/self.pixel_scale
         PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
         # PSF_x = np.sqrt((self.PSF_source/self.pixel_scale)**2 + (Rx)**2)
-        PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
+        # PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
+        PSF_λ = np.sqrt((self.diffuse_spectral_resolution/self.dispersion)**2 + (self.Line_width/self.dispersion)**2)
                     
         # nsize,nsize2 = size[1],size[0]
         wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
@@ -736,9 +737,12 @@ class Observation:
         else:
             # TODO no! use this only for ground instruments (based on altitude column)
             trans = Table.read("interpolate/transmission_ground.csv")
+            #TODO convolve based on resolution
             atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
             # print(wavelengths.min(),wavelengths.max(),(trans["wave_microns"]/1000).min(),(trans["wave_microns"]/1000).max())
-            atm_trans = atm_trans(wavelengths)  if (atmlambda & (Altitude<100) ) else self.Atmosphere
+            resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
+            atm_trans = np.convolve(atm_trans(wavelengths),np.ones(int(resolution_atm))/int(resolution_atm),mode="same")       if (atmlambda & (Altitude<100) ) else self.Atmosphere
+            # atm_trans =             atm_trans(wavelengths)                                                                     if (atmlambda & (Altitude<100) ) else self.Atmosphere
             QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
             # print(QE)
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
@@ -981,7 +985,8 @@ class Observation:
 
 
 if __name__ == "__main__":
-    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background = Observation().SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+    self = Observation()
+    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
 
 
 
