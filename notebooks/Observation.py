@@ -695,11 +695,14 @@ class Observation:
         Bias=0
         image = np.zeros((size[1], size[0]), dtype="float64")
         image_without_source = np.zeros((size[1], size[0]), dtype="float64")
+        image_only_source = np.zeros((size[1], size[0]), dtype="float64")
         image_stack = np.zeros((size[1], size[0]), dtype="float64")
+        image_stack_without_source = np.zeros((size[1], size[0]), dtype="float64")
         image_stack_only_source = np.zeros((size[1], size[0]), dtype="float64")
 
         # self.Dard_current & flux
         source_im = 0 * image[:, OSregions[0] : OSregions[1]]
+        sky_im = 0 * image[:, OSregions[0] : OSregions[1]]
         source_im_wo_atm = 0 * image[:, OSregions[0] : OSregions[1]]
         lx, ly = source_im.shape
         y = np.linspace(0, lx - 1, lx)
@@ -768,24 +771,26 @@ class Observation:
                 # spatial_profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  # 4 * l
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
-                profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                source_im =  np.outer(with_line,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
                 #TODO understand this part
                 if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                     # print(1)
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
                     if self.Slitlength/self.pixel_scale<nsize:
-                        profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) )
+                        sky_im =   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) ).T
                     else:
-                        profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * np.ones(nsize) / nsize )
+                        sky_im =   np.outer(atm_qe, (self.sky/self.exposure_time) * np.ones(nsize) / nsize ).T
                 else:
                     # print(2)
-                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
+                    sky_im =   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  ).T
                 # print(with_line,spatial_profile ,profile)
                 # print(self.PSF_source,self.pixel_scale,PSF_x)
                 # print(flux,with_line ,PSF_x)
-                source_im = source_im.T
-                source_im[:,:] += profile
-                source_im = source_im.T 
+                # source_im = source_im.T
+                # source_im[:,:] += profile
+                # source_im = source_im.T 
+                # sky_im = profile.T
+                # source_im = 
 
 
 
@@ -799,7 +804,8 @@ class Observation:
                 # source_im[50:55,:] += elec_pix #Gaussian2D.evaluate(x, y, flux, ly / 2, lx / 2, 100 * Ry, Rx, 0)
                 profile =  np.outer(with_line,Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x) /Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, Rx).sum())
                 source_im = source_im.T
-                source_im[:,:] += profile
+                # source_im[:,:] += profile
+                sky_im = profile
                 # source_im = source_im.T
                 # a = Table(data=([np.linspace(1500,2500,nsize2),np.zeros(nsize2)]),names=("WAVELENGTH","e_pix_sec"))
                 # a["e_pix_sec"] = elec_pix*(1-factor_lya) + factor_lya * (3700/1)*elec_pix* Gaussian1D.evaluate(a["WAVELENGTH"],  1,  line["wave"], 8) 
@@ -841,19 +847,21 @@ class Observation:
                 mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
                 slits = None #Table.read("Targets/2022/" + field).to_pandas()
                 source_im=np.zeros((nsize,nsize2))
+                source_background=np.zeros((nsize,nsize2))
                 source_im_wo_atm=np.zeros((nsize2,nsize))
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
                 profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
-
+                #TODO do not add sky here!!!
                 if np.isfinite(length) & ( np.ptp(a_ + b_)>0):
-                    # print(self.sky,self.exposure_time,a_,profile.shape)
-                    profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
+                    sky_profile =   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
                 else:
-                    profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
+                    sky_profile =   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
 
                 subim = np.zeros((nsize2,nsize))
                 #TODO this does not work when spectra because the ValueError: A value (4360.0) in x_new is above the interpolation range's maximum value (3277.23291015625).
-                source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
+                # source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
+                source_im[:,:] +=  profile.T*f(wavelengths) * atm_trans * QE
+                sky_im[:,:] +=  sky_profile.T*f(wavelengths) * atm_trans * QE
 
 
                 # source_im_wo_atm[:,:] +=  (subim+profile).T*f(wavelengths) #* atm_trans(wavelengths)
@@ -878,9 +886,11 @@ class Observation:
                     fig.savefig("/Users/Vincent/Github/notebooks/Spectra/h_%sfos_spc.png"%(source))
                     # plt.show()
         source_im_only_source =  source_im  * int(self.exposure_time)
-        source_background = self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 
-        source_im =  source_background +  source_im  * int(self.exposure_time)
-
+        source_background = sky_im  * int(self.exposure_time) + self.Dark_current_f  + self.extra_background * int(self.exposure_time)/3600 
+        source_im =  source_background +  source_im_only_source
+        print("source_im_only_source : ",source_im_only_source.shape)
+        print("source_background : ",source_background.shape)
+        print("source_im : ",source_im.shape)
         source_im_wo_atm = self.Dark_current_f + self.extra_background * int(self.exposure_time)/3600 +  source_im_wo_atm * int(self.exposure_time)
         y_pix=1000
         self.long = False
@@ -896,29 +906,36 @@ class Observation:
         if (self.EM_gain>1) & (self.CIC_charge>0):
             image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
             image_without_source[:, OSregions[0] : OSregions[1]] +=  np.random.gamma( np.random.poisson(source_background) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
+            image_only_source[:, OSregions[0] : OSregions[1]] +=  np.random.gamma( np.random.poisson(source_im_only_source) , self.EM_gain)
         else:
             # print(source_im)
             image[:, OSregions[0] : OSregions[1]] += np.random.poisson(source_im)
             image_without_source[:, OSregions[0] : OSregions[1]] +=  np.random.poisson(source_background)
+            image_only_source[:, OSregions[0] : OSregions[1]] +=  np.random.poisson(source_im_only_source)
             
         # take into acount CR losses
         #18%
         # image_stack[:, OSregions[0] : OSregions[1]] = np.nanmean([np.where(np.random.rand(size[1], OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
         if self.EM_gain>1:
             image_stack[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
-            image_stack_only_source[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_im_only_source)  + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)) for i in range(int(stack))],axis=0)
+            image_stack_only_source[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_im_only_source)  , self.EM_gain)) for i in range(int(stack))],axis=0)
+            image_stack_without_source[:, OSregions[0] : OSregions[1]] = np.mean([(np.random.gamma(np.random.poisson(source_background)  , self.EM_gain)) for i in range(int(stack))],axis=0)
         else:
             # image_stack[:, OSregions[0] : OSregions[1]] = np.mean([np.random.poisson(source_im) for i in range(int(stack))],axis=0)
             image_stack[:, OSregions[0] : OSregions[1]] = np.mean(np.random.poisson(np.repeat(source_im[:, :, np.newaxis], int(stack), axis=2)),axis=2)
             image_stack_only_source[:, OSregions[0] : OSregions[1]] = np.mean(np.random.poisson(np.repeat(source_im_only_source[:, :, np.newaxis], int(stack), axis=2)),axis=2)
+            image_stack_without_source[:, OSregions[0] : OSregions[1]] = np.mean(np.random.poisson(np.repeat(source_background[:, :, np.newaxis], int(stack), axis=2)),axis=2)
+
         # a = (np.where(np.random.rand(int(stack), size[1],OSregions[1]-OSregions[0]) < self.cosmic_ray_loss_per_sec/n_smearing,np.nan,1) * np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype=int) , self.EM_gain))  for i in range(int(stack))]))
         # Addition of the phyical image on the 2 overscan regions
         #image += source_im2
+        #TODO add this to background too
         if p_sCIC>0:
             image +=  np.random.gamma( np.array(np.random.rand(size[1], size[0])<p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
             #30%
             image_stack += np.random.gamma( np.array(np.random.rand(size[1], size[0])<int(stack)*p_sCIC,dtype=int) , np.random.randint(1, n_registers, size=image.shape))
 
+        #TODO add counting mode for slicers
         if self.counting_mode:
             a = np.array([ (np.random.gamma(np.random.poisson(source_im)  + np.array(np.random.rand( OSregions[1]-OSregions[0],size[1]).T<self.CIC_charge,dtype="int32") , self.EM_gain))  for i in range(int(stack))])
             cube_stack[:,:, OSregions[0] : OSregions[1]] = a
@@ -971,18 +988,20 @@ class Observation:
         imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
         imaADU_RN = (readout * ConversionGain).round().astype(type_)
         imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
-        imaADU_background = ((image_without_source + 1*readout) * ConversionGain).round().astype(type_)
+        imaADU_without_source = ((image_without_source + 1*readout) * ConversionGain).round().astype(type_)
+        imaADU_source = ((image_only_source + 0*readout) * ConversionGain).round().astype(type_)
         # print(np.max(image_stack),np.max(readout_stack),ConversionGain,np.max(((image_stack + 1*readout_stack) * ConversionGain).round()))
         # imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
         imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).astype(type_)
-        imaADU_stack_only_source = ((image_stack_only_source ) * ConversionGain).astype(type_) # TODO should I add + 1*readout_stack
+        imaADU_stack_only_source = ((image_stack_only_source + 0*readout_stack ) * ConversionGain).astype(type_) # TODO should I add + 1*readout_stack
+        imaADU_stack_without_source = ((image_stack_without_source + 1*readout_stack ) * ConversionGain).astype(type_) # TODO should I add + 1*readout_stack
         if self.counting_mode:
             imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
         else:
             imaADU_cube = imaADU_stack
         imaADU[imaADU>Full_well*1000] = np.nan
         # print(np.ptp(imaADU_stack), np.ptp(imaADU_stack_only_source))
-        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background#imaADU_wo_RN, imaADU_RN
+        return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source#imaADU_wo_RN, imaADU_RN
         # TODO to be sure that we can add things for the IFS cube we need to return the dark+sky+readnoise and the source image somewhere
         # but on what part do you do the photon counting thing? on both?
         # ishould just use it using self maybe?
@@ -990,7 +1009,7 @@ class Observation:
 
 if __name__ == "__main__":
     self = Observation()
-    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_background = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
+    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
 
 
 
