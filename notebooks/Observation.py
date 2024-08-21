@@ -710,6 +710,7 @@ class Observation:
         flux = (self.Signal_el /self.exposure_time)
         Rx = self.PSF_RMS_det/self.pixel_scale
         PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
+        # PSF_x = np.sqrt((self.PSF_source/self.pixel_scale)**2 + (Rx)**2)
         PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
                     
         # nsize,nsize2 = size[1],size[0]
@@ -742,10 +743,12 @@ class Observation:
             # print(QE)
         atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
 
-        length = self.Slitlength/2/self.pixel_scale
+        #TODO these 2 lines generate some issues when self.Slitlength>nsize
+        length = min(self.Slitlength/2/self.pixel_scale,nsize/2-1)
+        # length = self.Slitlength/2/self.pixel_scale
         a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
-
+        # print(self.Slitlength,length, nsize,  Rx)
 
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
             if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
@@ -762,10 +765,13 @@ class Observation:
                 # print( length, a, b, Rx )
                 # print(PSF_x,self.sky,self.exposure_time,length, np.isfinite(length))
                 profile =  np.outer(with_line,spatial_profile ) /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                #TODO understand this part
                 if np.isfinite(length) & (np.ptp(a_ + b_)>0):
+                    # print(1)
                     # profile += (self.sky/self.exposure_time) * (a + b) / (a + b).ptp()  * atm_qe
                     profile +=   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) / np.ptp(a_ + b_) )
                 else:
+                    # print(2)
                     profile +=   np.outer(atm_qe, np.ones(size[1]) *  (self.sky/self.exposure_time)  )  
                 # print(with_line,spatial_profile ,profile)
                 # print(self.PSF_source,self.pixel_scale,PSF_x)
