@@ -149,6 +149,8 @@ class Observation:
             self.Signal = 10**(-(self.Signal-20.08)/2.5)*2.06*1E-16
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
+        if self.Slitlength==self.Slitwidth:
+            self.Signal *= np.pi/4 # ratio between fiber disk and square slit
         if self.precise: # TBV are we sure we should do that here?
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
