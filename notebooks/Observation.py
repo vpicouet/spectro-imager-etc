@@ -149,8 +149,10 @@ class Observation:
             self.Signal = 10**(-(self.Signal-20.08)/2.5)*2.06*1E-16
         #TODO be sure we account for potential 2.35 ratio here
         #convolve input flux by instrument PSF
-        if self.Slitlength==self.Slitwidth:
-            self.Signal *= np.pi/4 # ratio between fiber disk and square slit
+        #TODO it does not work when it is an array
+        if type(self.Slitlength) == np.float64:
+            if (self.Slitlength==self.Slitwidth):
+                self.Signal *= np.pi/4 # ratio between fiber disk and square slit
         if self.precise: # TBV are we sure we should do that here?
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
@@ -351,9 +353,8 @@ class Observation:
         # ax4
         ax4.plot(getattr(self,x), np.log10(self.extended_source_5s),"-",lw=lw-1,label="SNR=5 Flux/Pow on one elem resolution (%0.2f-%0.2f)"%(np.log10(self.point_source_5s[self.i]),np.nanmin(np.log10(self.point_source_5s))),c="k")
         # if self.instrument==FIREBall:
-        if "FIREBall" in self.instrument:
-
-            ax4.plot(getattr(self,x), np.log10(self.extended_source_5s/np.sqrt(2)),"-",lw=lw-1,label="Two elem resolution (%0.2f-%0.2f)"%(np.log10(self.point_source_5s[self.i]/np.sqrt(2)),np.nanmin(np.log10(self.point_source_5s/np.sqrt(2)))),c="grey")
+        # if "FIREBall" in self.instrument:
+        ax4.plot(getattr(self,x), np.log10(self.extended_source_5s/np.sqrt(2)),"-",lw=lw-1,label="Two elem resolution (%0.2f-%0.2f)"%(np.log10(self.point_source_5s[self.i]/np.sqrt(2)),np.nanmin(np.log10(self.point_source_5s/np.sqrt(2)))),c="grey")
             # ax4.plot(getattr(self,x), np.log10(self.extended_source_5s/np.sqrt(40)),"-",lw=lw-1,label="20 sources stacked on 2 res elem. (%0.2f-%0.2f)"%(np.log10(self.point_source_5s[self.i]/np.sqrt(40)),np.nanmin(np.log10(self.point_source_5s/np.sqrt(40)))),c="lightgrey")
             # ax4.plot(getattr(self,x), np.log10(self.extended_source_5s/np.sqrt(2)/30),"-",lw=lw-1,label="Sources transported to high z: (%0.2f-%0.2f) \ngain of factor 22-50 depending on line resolution"%(np.log10(self.point_source_5s[self.i]/np.sqrt(2)/30),np.nanmin(np.log10(self.point_source_5s/np.sqrt(2)/30))),c="whitesmoke")
         T2 =  lambda x:np.log10(10**x/1.30e57)
