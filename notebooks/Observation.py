@@ -1019,6 +1019,58 @@ class Observation:
         # ishould just use it using self maybe?
 
 
+
+def fitswrite(fitsimage, filename, verbose=True, header=None):
+    """Write fits image function with different tests
+    """
+
+    if type(fitsimage) == np.ndarray:
+        try:
+            fitsimage = fits.HDUList([fits.PrimaryHDU(fitsimage, header=header)])[0]
+        except KeyError as e:
+            print(fitsimage)
+            print("discarding header due to error: ", e)
+            fitsimage = fits.HDUList([fits.PrimaryHDU(fitsimage)])[0]
+
+    if len(filename) == 0:
+        filename = tmp_image
+        fitsimage.header["NAXIS3"], fitsimage.header["NAXIS1"] = (
+            fitsimage.header["NAXIS1"],
+            fitsimage.header["NAXIS3"],
+        )
+        fitsimage.writeto(filename, overwrite=True)
+    if hasattr(fitsimage, "header"):
+        if "NAXIS3" in fitsimage.header:
+            # verboseprint("2D array: Removing NAXIS3 from header...")
+            fitsimage.header.remove("NAXIS3")
+        if "SKEW" in fitsimage.header:
+            fitsimage.header.remove("SKEW")
+    elif hasattr(fitsimage[0], "header"):
+        if "NAXIS3" in fitsimage[0].header:
+            # verboseprint("2D array: Removing NAXIS3 from header...")
+            fitsimage[0].header.remove("NAXIS3")
+        if "SKEW" in fitsimage[0].header:
+            fitsimage[0].header.remove("SKEW")
+
+    elif not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(os.path.dirname(filename))
+    if not os.path.exists(os.path.dirname(filename)):
+        # verboseprint("%s not existing: creating folde..." % (os.path.dirname(filename)))
+        os.makedirs(os.path.dirname(filename))
+    try:
+        fitsimage.writeto(filename, overwrite=True)
+    except IOError:
+        # verboseprint("Can not write in this repository : " + filename)
+        filename = "%s/%s" % (
+            os.path.dirname(os.path.dirname(filename)),
+            os.path.basename(filename),
+        )
+        # filename = "/tmp/" + os.path.basename(filename)
+        # verboseprint("Instead writing new file in : " + filename)
+        fitsimage.writeto(filename, overwrite=True)
+    # verboseprint("Image saved: %s" % (filename))
+    return filename
+
 if __name__ == "__main__":
     self = Observation()
     imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
