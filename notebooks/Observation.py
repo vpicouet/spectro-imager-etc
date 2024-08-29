@@ -20,11 +20,10 @@ import inspect
 from scipy.sparse import dia_matrix
 from scipy.interpolate import interpn
 from scipy.special import erf
-from astropy.modeling.functional_models import Gaussian2D
+from scipy import special
+from scipy.ndimage import gaussian_filter1d
 import pandas as pd
 import functools
-from scipy import special
-
 np.seterr(invalid='ignore')
  
 
@@ -738,7 +737,8 @@ class Observation:
             QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
             # TODO replace the 5 by the actual spectral resolution  
             resolution_atm = self.diffuse_spectral_resolution/(10*(trans["col1"][2]-trans["col1"][1]))
-            trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(resolution_atm))/int(resolution_atm),mode="same")
+            # trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(resolution_atm))/int(resolution_atm),mode="same")
+            trans["trans_conv"] = gaussian_filter1d(trans["col2"], resolution_atm/2.35)
             atm_trans =  interp1d(list(trans["col1"]*10),list(trans["trans_conv"]))#
             QE = QE(wavelengths)  if QElambda else self.QE
             atm_trans = atm_trans(wavelengths)   if (atmlambda & (Altitude<100) ) else self.Atmosphere
@@ -748,7 +748,8 @@ class Observation:
             atm_trans =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))#
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
             #convolve based on resolution
-            atm_trans = np.convolve(atm_trans(wavelengths),np.ones(int(resolution_atm))/int(resolution_atm),mode="same")       if atmlambda else self.Atmosphere
+            # atm_trans = np.convolve(atm_trans(wavelengths),np.ones(int(resolution_atm))/int(resolution_atm),mode="same")       if atmlambda else self.Atmosphere
+            atm_trans = gaussian_filter1d(atm_trans(wavelengths),resolution_atm/2.35)       if atmlambda else self.Atmosphere
             QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
             # plt.figure()
             # plt.plot(wavelengths,QE)
@@ -758,7 +759,7 @@ class Observation:
         else:
             atm_trans = self.Atmosphere
             QE = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
-        atm_qe =  atm_trans * QE / (self.QE*self.Atmosphere) 
+        atm_qe =  np.ones(nsize2) * atm_trans * QE / (self.QE*self.Atmosphere) 
 
         if (Altitude<10) & (wavelengths.min()>3141) & (wavelengths.max()<10425) & (sky_lines):
             sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
@@ -766,24 +767,29 @@ class Observation:
             # print("%i lines in the total number of lines: %i"%(len(sky_lines[mask]),len(sky_lines)))
             sky_lines = sky_lines[mask]
 
-            sky_lines = interp1d(sky_lines["wavelength"],sky_lines["flux"])
-            sky = sky_lines(wavelengths)
-            self.final_sky = (self.sky/self.exposure_time) * sky/np.mean(self.sky)   # * (self.Sky/1e-16)
+            # sky_lines = 
+            sky = interp1d(sky_lines["wavelength"],sky_lines["flux"])(wavelengths)
+            # TODO convolve the sky emission
+            self.final_sky = (self.sky/self.exposure_time) * sky * (self.Sky/1e-16) #/np.mean(self.sky)   # 
+            # self.final_sky = np.convolve(self.final_sky,np.ones(int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])))/int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])),mode="same")  
+            self.final_sky = gaussian_filter1d(self.final_sky, self.diffuse_spectral_resolution/2.35/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0]))
             # print(self.sky/self.exposure_time,self.Sky)
             # print(sky.min(),sky.min(),self.final_sky.min(),self.final_sky.max())
-            # plt.figure()
-            # plt.plot(wavelengths,sky)
-            # plt.show()
+
+            # self.final_sky = self.sky/self.exposure_time*np.ones(nsize2)
         else:
-            self.final_sky = self.sky/self.exposure_time#*np.ones(nsize2)
+            self.final_sky = self.sky/self.exposure_time*np.ones(nsize2)
+            # plt.figure()
+            # plt.plot(wavelengths,self.final_sky)
+            # plt.show()
         #TODO these 2 lines generate some issues when self.Slitlength>nsize
         # length = min(self.Slitlength/2/self.pixel_scale,nsize/2-1)
         length = self.Slitlength/2/self.pixel_scale
         a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         slit_profile = (a_ + b_) / np.ptp(a_ + b_)  # Shape: (100,)
-        slit_profile_2d = slit_profile[:, np.newaxis] 
-        atm_qe_2d = atm_qe[np.newaxis, :]  
+        # slit_profile_2d = slit_profile[:, np.newaxis] 
+        # atm_qe_2d = atm_qe[np.newaxis, :]  
         # print(self.final_sky.shape,slit_profile_2d.shape,atm_qe_2d.shape)
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
             if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
@@ -793,21 +799,22 @@ class Observation:
 
                 source_im =  np.outer(with_line,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
                 #TODO understand this part
-                self.sky_im = np.outer(slit_profile, self.final_sky * QE /self.QE)
+                # self.sky_im = np.outer( self.final_sky * QE /self.QE,slit_profile_2d).T
+
+
+                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
+                    if self.Slitlength/self.pixel_scale<nsize:
+                        self.sky_im =   np.outer(self.final_sky * QE /self.QE, slit_profile ).T
+                    else:
+                        self.sky_im =   np.outer(self.final_sky * QE /self.QE,  np.ones(nsize) / nsize ).T
+                else:
+                    self.sky_im =   np.outer(self.final_sky * QE /self.QE, np.ones(size[1])   ).T
                 # plt.figure()
                 # plt.imshow(self.sky_im)
                 # plt.colorbar(orientation="horizontal")
                 # plt.title("sum=%0.1E"%(self.sky_im.sum()))
                 # plt.show()
-
-                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
-                    if self.Slitlength/self.pixel_scale<nsize:
-                        self.sky_im =   np.outer(atm_qe, (self.final_sky) * (a_ + b_) / np.ptp(a_ + b_) ).T
-                    else:
-                        self.sky_im =   np.outer(atm_qe, (self.final_sky) * np.ones(nsize) / nsize ).T
-                else:
-                    self.sky_im =   np.outer(atm_qe, np.ones(size[1]) *  (self.final_sky)  ).T
-
+                # print(self.sky_im.shape)
 
                 #     if self.Slitlength/self.pixel_scale<nsize:
                 #         self.sky_im =   np.outer(atm_qe*final_sky,  (a_ + b_) / np.ptp(a_ + b_) ).T
@@ -862,22 +869,22 @@ class Observation:
                 source_im_wo_atm=np.zeros((nsize2,nsize))
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
                 profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
-                if np.isfinite(length) & ( np.ptp(a_ + b_)>0):
-                    # sky_profile =   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
+                # if np.isfinite(length) & ( np.ptp(a_ + b_)>0):
+                # sky_profile =   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
 
+                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                     if self.Slitlength/self.pixel_scale<nsize:
-                        self.sky_im =   np.outer(atm_qe, (final_sky) * (a_ + b_) / np.ptp(a_ + b_) ).T
+                        self.sky_im =   np.outer(self.final_sky * QE /self.QE, slit_profile ).T
                     else:
-                        self.sky_im =   np.outer(atm_qe, (final_sky) * np.ones(nsize) / nsize ).T
-
-
+                        self.sky_im =   np.outer(self.final_sky * QE /self.QE,  np.ones(nsize) / nsize ).T
                 else:
-                    self.sky_im =   np.outer(atm_qe, np.ones(size[1]) *  (final_sky)  ).T  
+                    self.sky_im =   np.outer(self.final_sky * QE /self.QE, np.ones(size[1])   ).T
 
 
                 subim = np.zeros((nsize2,nsize))
                 # self.sky_im[:,:] +=  sky_profile.T*    atm_trans * QE  #f(wavelengths)
-                source_im[:,:] +=  profile.T*     np.convolve(f(wavelengths),  np.ones(int(self.diffuse_spectral_resolution/min_interval))/int(self.diffuse_spectral_resolution/min_interval),mode="same"       ) * atm_trans * QE
+                # source_im[:,:] +=  profile.T*     np.convolve(f(wavelengths),  np.ones(int(self.diffuse_spectral_resolution/min_interval))/int(self.diffuse_spectral_resolution/min_interval),mode="same"       ) * atm_trans * QE
+                source_im[:,:] +=  profile.T*     gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_trans * QE
                 #TODO this does not work when spectra because the ValueError: A value (4360.0) in x_new is above the interpolation range's maximum value (3277.23291015625).
                 # source_im[:,:] +=  (subim+profile).T*f(wavelengths) * atm_trans * QE
                 #TODO verify that we should convove the 2 things (the atm absorption and source). Physcally we should only convolve the product of the 2
@@ -1086,7 +1093,7 @@ def fitswrite(fitsimage, filename, verbose=True, header=None):
             os.path.basename(filename),
         )
         # filename = "/tmp/" + os.path.basename(filename)
-        # verboseprint("Instead writing new file in : " + filename)
+        # verboseprint("Instead writing new file in : " + filename) 
         fitsimage.writeto(filename, overwrite=True)
     # verboseprint("Image saved: %s" % (filename))
     return filename
@@ -1095,8 +1102,8 @@ if __name__ == "__main__":
     # self = Observation()
     # imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
 
-    self = Observation( instrument="KCWI red")
-    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Baseline Spectra", size=[500, 100], OSregions=[0, 500], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=False,atmlambda=True,fraction_lya=0.05,Altitude=3)
+    self = Observation( instrument="KCWI red",Signal=0*1e-27,Sky=1e-15,Line_width=600,Slitlength=6)
+    imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Baseline Spectra", size=[500, 100], OSregions=[0, 500], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=False,atmlambda=False,fraction_lya=0.05,Altitude=3,sky_lines=True)
     if 1==1:
         arrays = {
         'imaADU': imaADU,
@@ -1109,14 +1116,14 @@ if __name__ == "__main__":
         'imaADU_stack_without_source': imaADU_stack_without_source,
         'imaADU_source': imaADU_source
         }
-        fig, axes = plt.subplots(3, 3, figsize=(15, 10),sharex=True, sharey=True)
+        fig, axes = plt.subplots(3, 3, figsize=(15, 8),sharex=True, sharey=True)
         fig.suptitle('Visualisation des Arrays')
 
         # Parcours de chaque tableau et affichage
         for ax, (title, data) in zip(axes.flatten(), arrays.items()):
-            im = ax.imshow(data.T, cmap='viridis', aspect='auto')  # Choix du colormap
+            im = ax.imshow(data, cmap='viridis', aspect='auto')  # Choix du colormap
             ax.set_title(title)
-            ax.axis('off')  # Enlève les axes pour une présentation plus claire
+            # ax.axis('off')  # Enlève les axes pour une présentation plus claire
             fig.colorbar(im, ax=ax)  # Ajoute une colorbar à chaque subplot
 
         plt.tight_layout(rect=[0, 0, 1, 0.95])  # Ajuste le layout
