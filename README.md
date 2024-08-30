@@ -1,8 +1,8 @@
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/vpicouet/fireball2-etc/main?labpath=notebooks%2FETC.ipynb)
 
 Click on the video to access to the ETC
-[![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/ETC.gif)](https://www.youtube.com/watch?v=XcDm2JQDMLY)
-You can add your instrument characteristics [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing)
+[![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/ETC.gif)](https://spectro-imager-etc-fbcad4e5849d.herokuapp.com)
+You can add your instrument characteristics [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing), in the "In progress" tab. As soon as the instrument characteristics are all indicated, the instrument will be added to the main tab and will be available on the ETC and image simulator.
 
 [![Alt Text](https://github.com/vpicouet/pyds9plugin-doc/blob/master/docs/fig/Instruments.jpg)](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing)
 
@@ -26,7 +26,7 @@ The different variables used which can all be used in the x-axis to analyze the 
 - **Spectrograph design:** spectral resolution, slit width, dispersion
 - **Detector parameters:** quantum efficiency, dark current, read noise, readout time, pixel size, image loss due to cosmic ray
 - **emCCD additional parameters:** EM gain, CIC, thresholding, smearing exponential length and temperature if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
-- **Image simulator-related parameters:** Full well of the detector, conversion gain and throughput FWHM to add the λ dependency.
+- **Image simulator-related parameters:** Full well of the detector, conversion gain, throughput FWHM to add the λ dependency, Atmospheric transmission λ dependancy as well as atmospheric emission lines. 
 
 
 
@@ -35,7 +35,10 @@ The different variables used which can all be used in the x-axis to analyze the 
 ### SNR visualization
 The SNR plot is crafted to offer a straightforward depiction of noise budgets concerning various variables that can be fine-tuned or mitigated to enhance instrument sensitivity. In the top panel, the noise from distinct sources (Signal, Dark, Sky, CIC, RN) is presented in electrons per pixel. The middle panel provides the average electron-per-pixel value for each component (pre-stacking). The last plot outlines the relative fractions of all noise sources per resolution element per N frames over the total acquisition tim and the resulting SNR.
 
-### Image simulator
+![alternative text](description/SNR.jpg)
+
+
+### Spetra simulator
 
 The image simulator utilizes the various parameters and a specific source (galaxy/stellar spectra) to simulate the following:
 - **single & stacked image:** Presented in the upper left and right sections, these images are 100 × 500 pixels (resulting in distinct physical FOVs for different instruments). The spectral direction is horizontal, while the spatial one is vertical. The slit size is incorporated, along with contributions from different noise sources.
@@ -43,6 +46,14 @@ The image simulator utilizes the various parameters and a specific source (galax
 - **Profiles:** Lower right plot offers profiles in both spatial and spectral directions for the single (large & transparent) and stacked images.
 
 The code assumes a standard (λ-dependent) atmospheric transmission for ground instruments. Users are encouraged to upload their instrument throughput/QE λ-dependency on the GitHub repository (under notebook/interpolate) using the format "Instrument_name.csv" (λ in nanometers on the first column and with no column name). If no table is added, the code will default to using the Throughput_FWHM value in the spreadsheet.
+
+![alternative text](description/spectra.jpg)
+
+
+### IFU cube simulator
+
+![alternative text](description/IFU.jpg)
+
 
 # <center>Contributions calculations in Electrons per pixel </center>
 
