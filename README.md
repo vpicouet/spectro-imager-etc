@@ -12,9 +12,10 @@ You can add your instrument characteristics [here](https://docs.google.com/sprea
 # <center>ETC - SNR calculator </center>
 
 ## Description
-This straightforward ETC provides an estimated signal-to-noise ratio for an extended source on a resolution element. Its key attributes lie in its versatility, user-friendly interface, and diverse plotting options. The ETC is designed to accommodate any spectrograph, and individuals can effortlessly contribute new instruments or configurations [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077) for direct utilization within the tool.
+This straightforward ETC provides an estimated signal-to-noise ratio for any spectro-imager instrument. Its key attributes lie in its versatility, user-friendly interface, and diverse plotting options. The ETC is designed to accommodate any spectro-imager, and scientists can effortlessly contribute new instruments or configurations [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077) for direct utilization within the tool.
 
-The ETC GUI serves as a valuable resource, offering a quick overview of not only the essential instrument parameters and constraints but also presenting insights into tradeoffs, potential optimizations, and mitigation strategies. Currently, there are two primary visualization options: the SNR plot and the image simulation, both capable of accommodating all instruments stored in the [spreadsheet](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077). These visualizations dynamically adjust as parameters are modified using the intuitive widgets.
+The ETC GUI serves as a valuable resource, offering a quick overview of not only the essential instrument parameters and constraints but also presenting insights into tradeoffs, potential optimizations, and mitigation strategies. Currently, there are two primary visualization options: the SNR plot and the image simulation, both capable of accommodating all instruments stored in the [spreadsheet](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077). 
+For integral field units (slicers, fiber IFU, etc), there is a third plot that shows the data cube in the 2D spatial dimension and spectral dimension. These visualizations dynamically adjust as parameters are modified using the intuitive widgets.
 
 
 ## Variables
@@ -33,12 +34,12 @@ The different variables used which can all be used in the x-axis to analyze the 
 ## Outputs
 
 ### SNR visualization
-The SNR plot is crafted to offer a straightforward depiction of noise budgets concerning various variables that can be fine-tuned or mitigated to enhance instrument sensitivity. In the top panel, the noise from distinct sources (Signal, Dark, Sky, CIC, RN) is presented in electrons per pixel. The middle panel provides the average electron-per-pixel value for each component (pre-stacking). The last plot outlines the relative fractions of all noise sources per resolution element per N frames over the total acquisition tim and the resulting SNR.
+The SNR plot is crafted to offer a straightforward depiction of noise budgets concerning various variables that can be fine-tuned or mitigated to enhance instrument sensitivity. In the top panel, the noise from distinct sources (Signal, Dark, Sky, CIC, RN) is presented in electrons per pixel. The middle panel provides the average electron-per-pixel value for each component (pre-stacking). The last plot outlines the relative fractions of all noise sources per resolution element per N frames over the total acquisition time and the resulting SNR on a resolution element
 
 ![alternative text](description/SNR.jpg)
 
 
-### Spetra simulator
+### Spectra simulator
 
 The image simulator utilizes the various parameters and a specific source (galaxy/stellar spectra) to simulate the following:
 - **single & stacked image:** Presented in the upper left and right sections, these images are 100 × 500 pixels (resulting in distinct physical FOVs for different instruments). The spectral direction is horizontal, while the spatial one is vertical. The slit size is incorporated, along with contributions from different noise sources.
