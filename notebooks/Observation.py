@@ -741,7 +741,9 @@ class Observation:
             self.atm_trans = self.atm_trans   if (atmlambda & (Altitude<100) ) else self.Atmosphere
 
         elif Altitude<10: # only for ground instruments (based on altitude column)
-            trans = Table.read("interpolate/transmission_ground.csv")
+            # trans = Table.read("interpolate/transmission_ground.csv")
+            trans = Table.read("interpolate/pwv_atm.csv")
+            trans["wave_microns"] = trans["wavelength"]/1000
             self.atm_trans_before_convolution =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))(wavelengths)
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
             #convolve based on resolution
