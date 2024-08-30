@@ -20,14 +20,48 @@ For integral field units (slicers, fiber IFU, etc), there is a third plot that s
 
 ## Variables
 
-The different variables used which can all be used in the x-axis to analyze the impact on SNR are:
-- **Source:** flux, sky, source extension, source's line width
-- **Observing strategy:** Exposure time, total acquisition time, atmospheric transmission, observed wavelength, distance to source/line center
-- **Instrument design:** collecting area, plate scale, instrument throughput, spatial resolution (at the mask and at the detector)
-- **Spectrograph design:** spectral resolution, slit width, dispersion
-- **Detector parameters:** quantum efficiency, dark current, read noise, readout time, pixel size, image loss due to cosmic ray
-- **emCCD additional parameters:** EM gain, CIC, thresholding, smearing exponential length and temperature if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
-- **Image simulator-related parameters:** Full well of the detector, conversion gain, throughput FWHM to add the λ dependency, Atmospheric transmission λ dependancy as well as atmospheric emission lines. 
+The different instrument parameters used can all be used in the x-axis to analyze the impact on SNR.
+Their units description can also be found in the instrument spreadsheet (as remarks). As well as when the user put the cursor on each widget name.
+- **Source:** 
+  - **Flux**: erg/cm$^2$/s/arcsec$^2$/Å
+  - **Sky**: Level of sky background illumination in ergs/cm$^2$/s/arcsec$^2$/Å
+  - **Source extension**: Spatial extension of the source in arcseconds " (σ)
+  - **Source's line width**: Spectral extension of the source/emission line in Å
+- **Observing strategy:** 
+  - **Observed wavelength**: Effective wavelength of the instrument in nanometer
+  - **Exposure time**: Exposure time of individual frames in seconds
+  - **Total acquisition time**: Total acquisition time in hours
+  - **Atmospheric transmission**:  %/100
+  - **Distance to source/line center**: Distance to the source being analyzed ['' or Å]
+- **Instrument design:** 
+  - **Collecting area**: Physical collecting area of the instrument in m$^2$
+  - **Plate scale**: Pixel plate scale in  ''/pix
+  - **Throughput**: Instrument throughput at effective wavelength (not accounting for detector quantum efficiency and atmospheric transmission)
+  - **Spatial resolution** (at the mask and at the detector): 
+- **Spectrograph design:** 
+  - **Spectral resolution**: Spectrograph spectral resolution λ[Å]/dλ[Å]
+  - **Slit width**: Width of the slit/slice/fiber in ''
+  - **Slit length**: Length of the slit/slice/fiber in ''
+  - **Dispersion**: Dispersion at the detector Å/pix 
+- **Detector parameters:** 
+  - **Quantum efficiency**: Detector quantum efficiency in %/100
+  - **Dark current**: Detector dark current [e-/pix/hour]
+  - **Read noise**: etector readout noise in electrons/pixel
+  - **Readout time**: Time in seconds that it takes for images to get read. Use 0 for MCPs or rolling shutter
+  - **Pixel size**: Pixel size in microns
+  - **Image loss due to cosmic ray**: Cosmic ray loss per second. eg. 0.01 would mean that 1 sec image looses 1\% pixels due to cosmic rays
+  - **extra_background**: Any additional source of straylight (could be any internal or external contribution/leak), in  addition to the nominal sky background
+- **emCCD additional parameters:** 
+  - **EM gain**: EMCCD amplification gain in e-/e-
+  - **CIC**: EMCCD spurious charges due to amplification in electrons [e-/pix]
+  - **Thresholding**: 
+  - **Smearing exponential length (~CTE)**: Smearing length of the EMCCD (exponential length in pixels). This length, representing the charge transfer efficiency is fixed by the temperature when the Temp checkbox is checked.
+  - **Temperature**: if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
+- **Image simulator-related parameters:** Full well of the detector
+  - **Conversion gain**: to convert e- into detector ADU (ADU/e-)
+  - **Throughput FWHM**  taking into account all optics and QE, not atmosphere, to add the λ dependency.
+  - **Atmospheric transmission** [checkbox] to add a λ-depend transmission model (based on [pwv_kpno](https://mwvgroup.github.io/pwv_kpno/1.0.0/documentation/html/atmospheric_modeling.html)) for ground instruments (this only applies to the source, not to the sky emission)
+  - **Atmospheric emission lines**: checkbox] replaces a flat sky continuum by sky emission lines based on [UVES estimates](https://www.eso.org/observing/dfo/quality/UVES/pipeline/sky_spectrum.html) 
 
 
 
