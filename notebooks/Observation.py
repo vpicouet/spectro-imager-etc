@@ -1019,7 +1019,7 @@ class Observation:
             imaADU_cube = ((cube_stack + 1*readout_cube) * ConversionGain).round().astype("int32")
         else:
             imaADU_cube = imaADU_stack
-        # imaADU[imaADU>Full_well*1000] = np.nan
+        imaADU[imaADU>Full_well*1000] = np.nan
         # print(np.ptp(imaADU_stack), np.ptp(imaADU_stack_only_source))
         return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source#imaADU_wo_RN, imaADU_RN
         # TODO to be sure that we can add things for the IFS cube we need to return the dark+sky+readnoise and the source image somewhere
