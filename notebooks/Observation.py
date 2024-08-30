@@ -742,8 +742,8 @@ class Observation:
 
         elif Altitude<10: # only for ground instruments (based on altitude column)
             # trans = Table.read("interpolate/transmission_ground.csv")
-            trans = Table.read("interpolate/pwv_atm.csv")
-            trans["wave_microns"] = trans["wavelength"]/1000
+            trans = Table.read("interpolate/pwv_atm_combined_ground.csv")
+            # trans["wave_microns"] = trans["wavelength"]/1000
             self.atm_trans_before_convolution =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))(wavelengths)
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
             #convolve based on resolution
@@ -759,6 +759,7 @@ class Observation:
             self.atm_trans_before_convolution = self.Atmosphere
             self.atm_trans = self.Atmosphere
             self.QE_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
+        # TODO should we really devide by atmosphere?
         atm_qe =  np.ones(nsize2) * self.atm_trans * self.QE_curve / (self.QE*self.Atmosphere) 
 
         if (Altitude<10) & (wavelengths.min()>3141) & (wavelengths.max()<10425) & (sky_lines):
@@ -811,9 +812,6 @@ class Observation:
 
 
             else:
-                # for file in glob.glob("/Users/Vincent/Downloads/FOS_spectra/FOS_spectra_for_FB/CIV/*.fits"):
-
-                # print(wave_min, wave_max)
                 if "_" not in source:
                     flux_name,wave_name ="FLUX", "WAVELENGTH"
                     fname = "h_%sfos_spc.fits"%(source.split(" ")[1])
