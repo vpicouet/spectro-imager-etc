@@ -13,9 +13,24 @@ You can add your instrument characteristics [here](https://docs.google.com/sprea
 
 ## Description
 This straightforward ETC provides an estimated signal-to-noise ratio for any spectro-imager instrument. Its key attributes lie in its versatility, user-friendly interface, and diverse plotting options. The ETC is designed to accommodate any spectro-imager, and scientists can effortlessly contribute new instruments or configurations [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077) for direct utilization within the tool.
+The ETC 
 
 The ETC GUI serves as a valuable resource, offering a quick overview of not only the essential instrument parameters and constraints but also presenting insights into tradeoffs, potential optimizations, and mitigation strategies. Currently, there are two primary visualization options: the SNR plot and the image simulation, both capable of accommodating all instruments stored in the [spreadsheet](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077). 
 For integral field units (slicers, fiber IFU, etc), there is a third plot that shows the data cube in the 2D spatial dimension and spectral dimension. These visualizations dynamically adjust as parameters are modified using the intuitive widgets.
+
+## Interest and Philosophy
+
+Exposure Time Calculators (ETCs) are integral tools for optimizing observational strategies in astronomy, typically tailored to specific instruments. However, there has been a notable development of universal ETCs capable of accommodating diverse telescope and spectrograph configurations
+This paper introduces a new approach in ETC, aiming for broader applicability, with a high level of genericity.  [while maintaining precision comparable to specialized counterparts like ETC-42]
+In opposition to usual ETC's, its goal goes beyond their nominal use of predicting the SNR of a source given some instrument parameter
+Indeed, as others ETC, it provides an image simulator that can predict observations in order to Improve reduction pipeline or adapt detection strategy
+But more importantly it allows to see analyze the evolution of the SNR with all the instrument parameters, allowing to Examine the instrument efficiency, explore the SNR evolution under different scenarios, run different trade studies.
+The ETC is linked to an online database (spreadshseet) to allow any scientist to add their own spectrograph instrument. 
+The current version already encompass more than 20 instruments, some with several channels or configurations.
+This tool proves valuable for trade-off analysis and instrument comparisons.
+Despite being a personal initiative with modest resources, it serves as an illustrative example of development simplicity and collaborative database utilization.
+Observations predictions have been cross checked with ETC-42 based on several spectrgraph design.
+This article briefly outlines its development philosophy and significant role in facilitating trade-off analyses for future instrument developments, such as the FB project.
 
 
 ## Variables
@@ -82,7 +97,7 @@ The image simulator utilizes the various parameters and a specific source (galax
 
 The code assumes a standard (λ-dependent) atmospheric transmission for ground instruments. Users are encouraged to upload their instrument throughput/QE λ-dependency on the GitHub repository (under notebook/interpolate) using the format "Instrument_name.csv" (λ in nanometers on the first column and with no column name). If no table is added, the code will default to using the Throughput_FWHM value in the spreadsheet.
 
-![alternative text](description/spectra.jpg)
+![alternative text](description/Spectra.jpg)
 
 
 ### IFU cube simulator
@@ -138,27 +153,27 @@ In the case of electron-amplified CCDs, some considerations must be taken into a
 
 
 
-
-<!-- Other considerations taken into account:
-- cosmic ray loss directly impacting the number of images 
-- Taking into account line width
-- Taking into account cut my the slit
-- 
-
-When doing some photon-counting emCCD thresholding, some new considerations must be added:
-- Only part of the charges are accounted for
-- When thresholding is applied, the smearing can be changed as it will impact the position of the threshold that optimizes the SNR. For this optimal threshold, the fraction of signal and readnoise kept (above the threshold) is given.
--  -->
-
-
-
-
-
-
-
-
-
-
-
 ![alternative text](description/Chart.jpg)
 
+
+
+
+
+
+# Installing locally spectro-imager-etc
+
+
+- Installing a new conda environement
+```
+conda create --name etc python=3.12
+conda activate etc
+```
+- Download and install the github package
+```
+git clone https://github.com/vpicouet/spectro-imager-etc.git
+pip3 install -e .
+```
+If you want to pull any new update just run 
+```
+git pull
+```
