@@ -29,7 +29,7 @@ sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 try:
-    instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,28]).drop(["."],axis=1)
+    instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
     instruments = Table.from_pandas(instruments_pandas)
 except Exception:
     instruments = Table.read("Instruments/instruments.csv")
