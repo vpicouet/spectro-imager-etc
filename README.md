@@ -13,24 +13,53 @@ You can add your instrument characteristics [here](https://docs.google.com/sprea
 
 ## Description
 This straightforward ETC provides an estimated signal-to-noise ratio for any spectro-imager instrument. Its key attributes lie in its versatility, user-friendly interface, and diverse plotting options. The ETC is designed to accommodate any spectro-imager, and scientists can effortlessly contribute new instruments or configurations [here](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077) for direct utilization within the tool.
-The ETC 
 
 The ETC GUI serves as a valuable resource, offering a quick overview of not only the essential instrument parameters and constraints but also presenting insights into tradeoffs, potential optimizations, and mitigation strategies. Currently, there are two primary visualization options: the SNR plot and the image simulation, both capable of accommodating all instruments stored in the [spreadsheet](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?pli=1#gid=2066284077). 
 For integral field units (slicers, fiber IFU, etc), there is a third plot that shows the data cube in the 2D spatial dimension and spectral dimension. These visualizations dynamically adjust as parameters are modified using the intuitive widgets.
 
 ## Interest and Philosophy
 
-Exposure Time Calculators (ETCs) are integral tools for optimizing observational strategies in astronomy, typically tailored to specific instruments. However, there has been a notable development of universal ETCs capable of accommodating diverse telescope and spectrograph configurations
-This paper introduces a new approach in ETC, aiming for broader applicability, with a high level of genericity.  [while maintaining precision comparable to specialized counterparts like ETC-42]
-In opposition to usual ETC's, its goal goes beyond their nominal use of predicting the SNR of a source given some instrument parameter
-Indeed, as others ETC, it provides an image simulator that can predict observations in order to Improve reduction pipeline or adapt detection strategy
-But more importantly it allows to see analyze the evolution of the SNR with all the instrument parameters, allowing to Examine the instrument efficiency, explore the SNR evolution under different scenarios, run different trade studies.
-The ETC is linked to an online database (spreadshseet) to allow any scientist to add their own spectrograph instrument. 
+Exposure Time Calculators (ETCs) are integral tools for optimizing observational strategies in astronomy, typically tailored to specific instruments. However, there has been a notable development of universal ETCs capable of accommodating diverse telescope and spectrograph configurations.
+This paper introduces a new approach in ETC, aiming for broader applicability, with a high level of genericity.  
+<!-- [while maintaining precision comparable to specialized counterparts like ETC-42] -->
+In opposition to usual ETC's, its goal goes beyond their nominal use of predicting the SNR of a source given the site, instrument and observation parameters specifications.
+As others ETC, it provides the expected SNR and an image simulator that can predict observations in order to improve reduction pipeline or adapt detection strategy, but more importantly it allows to see analyze the evolution of the SNR with all the instrument parameters, allowing to Examine the instrument efficiency, explore the SNR evolution under different scenarios, run different trade studies.
+The ETC is linked to an [online database/spreadshseet](https://docs.google.com/spreadsheets/d/1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU/edit?usp=sharing) to allow any scientist to add their own spectrograph instrument. 
 The current version already encompass more than 20 instruments, some with several channels or configurations.
 This tool proves valuable for trade-off analysis and instrument comparisons.
-Despite being a personal initiative with modest resources, it serves as an illustrative example of development simplicity and collaborative database utilization.
-Observations predictions have been cross checked with ETC-42 based on several spectrgraph design.
+Despite being a personal initiative with modest resources, it serves as an illustrative example of development simplicity (a simple jupyter notebook combined with Heroku) and collaborative database utilization.
+Observations predictions have been cross checked with ETC-42 based on several spectrograph design.
 This article briefly outlines its development philosophy and significant role in facilitating trade-off analyses for future instrument developments, such as the FB project.
+
+
+
+## Outputs
+
+### SNR visualization
+The SNR plot is crafted to offer a straightforward depiction of noise budgets concerning various variables that can be fine-tuned or mitigated to enhance instrument sensitivity. In the top panel, the noise from distinct sources (Signal, Dark, Sky, CIC, RN) is presented in electrons per pixel. The middle panel provides the average electron-per-pixel value for each component (pre-stacking). The last plot outlines the relative fractions of all noise sources per resolution element per N frames over the total acquisition time and the resulting SNR on a resolution element
+
+![alternative text](description/SNR.jpg)
+
+
+### Spectra simulator
+
+The image simulator utilizes the various parameters and a specific source (galaxy/stellar spectra) to simulate the following:
+- **single & stacked image:** Presented in the upper left and right sections, these images are 100 × 500 pixels (resulting in distinct physical FOVs for different instruments). The spectral direction is horizontal, while the spatial one is vertical. The slit size is incorporated, along with contributions from different noise sources.
+- **Histogram:** Lower left plot displays the histogram for both individual and stacked images.
+- **Profiles:** Lower right plot offers profiles in both spatial and spectral directions for the single (large & transparent) and stacked images.
+
+The code assumes a standard (λ-dependent) atmospheric transmission for ground instruments. Users are encouraged to upload their instrument throughput/QE λ-dependency on the GitHub repository (under notebook/interpolate) using the format "Instrument_name.csv" (λ in nanometers on the first column and with no column name). If no table is added, the code will default to using the Throughput_FWHM value in the spreadsheet.
+
+![alternative text](description/Spectra.jpg)
+
+
+### IFU cube simulator
+For integral field spectrographs (n=3 in spreadsheet, slicer or fiber IFU), the code uses the generated spectra (Output 2) to generate the spatio-spectral data cube. For sake of execution speed, the code only converts the 2D spectral into a 3D sube by convolving it by the spatial extension of the source (added quadratically to the instrument resolution). Source's signal and background (sky, dark, addition background) are added independantly and readnoise pixels values are shuffled to prevent any noise correlation. 
+
+![alternative text](description/IFU.jpg)
+
+
+
 
 
 ## Variables
@@ -69,8 +98,8 @@ Their units description can also be found in the instrument spreadsheet (as rema
 - **emCCD additional parameters:** 
   - **EM gain**: EMCCD amplification gain in e-/e-
   - **CIC**: EMCCD spurious charges due to amplification in electrons [e-/pix]
-  - **Thresholding**: 
   - **Smearing exponential length (~CTE)**: Smearing length of the EMCCD (exponential length in pixels). This length, representing the charge transfer efficiency is fixed by the temperature when the Temp checkbox is checked.
+  - **Thresholding**: [Yes/No] and the possibility to choose the threshold value in the presence of smearing (which reduces photon counting efficiency)
   - **Temperature**: if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
 - **Image simulator-related parameters:** Full well of the detector
   - **Conversion gain**: to convert e- into detector ADU (ADU/e-)
@@ -79,30 +108,6 @@ Their units description can also be found in the instrument spreadsheet (as rema
   - **Atmospheric emission lines**: checkbox] replaces a flat sky continuum by sky emission lines based on [UVES estimates](https://www.eso.org/observing/dfo/quality/UVES/pipeline/sky_spectrum.html) 
 
 
-
-## Outputs
-
-### SNR visualization
-The SNR plot is crafted to offer a straightforward depiction of noise budgets concerning various variables that can be fine-tuned or mitigated to enhance instrument sensitivity. In the top panel, the noise from distinct sources (Signal, Dark, Sky, CIC, RN) is presented in electrons per pixel. The middle panel provides the average electron-per-pixel value for each component (pre-stacking). The last plot outlines the relative fractions of all noise sources per resolution element per N frames over the total acquisition time and the resulting SNR on a resolution element
-
-![alternative text](description/SNR.jpg)
-
-
-### Spectra simulator
-
-The image simulator utilizes the various parameters and a specific source (galaxy/stellar spectra) to simulate the following:
-- **single & stacked image:** Presented in the upper left and right sections, these images are 100 × 500 pixels (resulting in distinct physical FOVs for different instruments). The spectral direction is horizontal, while the spatial one is vertical. The slit size is incorporated, along with contributions from different noise sources.
-- **Histogram:** Lower left plot displays the histogram for both individual and stacked images.
-- **Profiles:** Lower right plot offers profiles in both spatial and spectral directions for the single (large & transparent) and stacked images.
-
-The code assumes a standard (λ-dependent) atmospheric transmission for ground instruments. Users are encouraged to upload their instrument throughput/QE λ-dependency on the GitHub repository (under notebook/interpolate) using the format "Instrument_name.csv" (λ in nanometers on the first column and with no column name). If no table is added, the code will default to using the Throughput_FWHM value in the spreadsheet.
-
-![alternative text](description/Spectra.jpg)
-
-
-### IFU cube simulator
-
-![alternative text](description/IFU.jpg)
 
 
 # <center>Contributions calculations in Electrons per pixel </center>
@@ -115,10 +120,6 @@ We decided deliberately to use flux per Angstrom with a gaussian profile so that
 Users can also directly upload spectra in  $ergs/cm^2/s/asec^2/Å$ in the GitHub repository (under notebooks/Spectra, λ in nanometers on the first column and with no column name).
 
 Then, both contributions are converted similarly into electrons per pixels:
-
-
-
-
 
 $$Sky_{e-/pix/exp} = Sky_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix}  \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
 

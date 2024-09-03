@@ -29,11 +29,13 @@ sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 try:
-    instruments = Table.from_pandas(pd.read_csv(url))
+    instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,28]).drop(["."],axis=1)
+    instruments = Table.from_pandas(instruments_pandas)
 except Exception:
-    instruments = Table.read("Instruments.csv")
+    instruments = Table.read("Instruments/instruments.csv")
 instruments = instruments[instruments.colnames]
-instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[3:]}
+instruments
+instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
 
 
 
@@ -821,7 +823,6 @@ class Observation:
                     except FileNotFoundError: 
                         a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
                     a["photons"] = a[flux_name]/9.93E-12   
-                    #TODO increasing the mirror size increase signal but not sky!!!
                     a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
                 elif "COSMOS" in source:
                     a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[1]),format="ascii")
@@ -871,7 +872,7 @@ class Observation:
                 #TODO this does not work when spectra because the ValueError: A value (4360.0) in x_new is above the interpolation range's maximum value (3277.23291015625).
                 # source_im[:,:] +=  (subim+profile).T*f(wavelengths) * self.atm_trans * QE
                 #TODO verify that we should convove the 2 things (the atm absorption and source). Physcally we should only convolve the product of the 2
-                #TODO same issue, should we apply the transmission only to the source or also to the sky? Depends if the sky light is actually comming from the atm itself or the cosmos... or if the model is already taking atm transmission nto account or not...
+                #we apply the absorption only to th source, not the sky emission
                 # This we don't see with SCWI because mirror is too small and we can not change the flux! But we sould convovle
                 # source_im[:,:] +=  profile.T*     f(wavelengths) * self.atm_trans * QE
 
@@ -1022,7 +1023,6 @@ class Observation:
         imaADU[imaADU>Full_well*1000] = np.nan
         # print(np.ptp(imaADU_stack), np.ptp(imaADU_stack_only_source))
         return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source#imaADU_wo_RN, imaADU_RN
-        # TODO to be sure that we can add things for the IFS cube we need to return the dark+sky+readnoise and the source image somewhere
         # but on what part do you do the photon counting thing? on both?
         # ishould just use it using self maybe?
 
@@ -1083,7 +1083,7 @@ def fitswrite(fitsimage, filename, verbose=True, header=None):
 if __name__ == "__main__":
     # self = Observation()
     # imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
-
+    instruments.write("Instruments/instruments.csv")
     self = Observation( instrument="tREXS",Signal=0*1e-27,Sky=1e-15,Line_width=600,Slitlength=6)
     imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Baseline Spectra", size=[500, 100], OSregions=[0, 500], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=False,atmlambda=False,fraction_lya=0.05,sky_lines=True)#,Altitude=3
     if 1==1:
