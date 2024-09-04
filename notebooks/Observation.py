@@ -22,6 +22,10 @@ from scipy import special
 from scipy.ndimage import gaussian_filter1d
 import pandas as pd
 import functools
+import re
+from astropy.modeling.models import BlackBody
+from astropy import units as u
+from astropy.visualization import quantity_support
 np.seterr(invalid='ignore')
  
 
@@ -790,27 +794,33 @@ class Observation:
         b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         slit_profile = (a_ + b_) / np.ptp(a_ + b_)  # Shape: (100,)
 
-        if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source):
+        if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source)| ("Blackbody" in source):
             if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
-                with_line = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
-                with_line *= atm_qe
+                spectra = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
+                spectra *= atm_qe
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
 
-                source_im =  np.outer(with_line,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
 
-                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
-                    if self.Slitlength/self.pixel_scale<nsize:
-                        self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
-                    else:
-                        self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
-                else:
-                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T
-                # plt.figure()
-                # plt.imshow(self.sky_im)
-                # plt.colorbar(orientation="horizontal")
-                # plt.title("sum=%0.1E"%(self.sky_im.sum()))
-                # plt.show()
-                # print(self.sky_im.shape)
+
+            elif "blackbody" in source.lower():
+                blackbody_spectra = BlackBody(temperature=int(re.search(r'\d+', source).group())*u.K)(wavelengths * u.nm)
+                # Convert blackbody spectra to desired units: erg / (cm^2 * s * Å * arcsec^2)
+                flux_in_erg = blackbody_spectra.to(
+                    u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
+                    equivalencies=u.spectral_density(wavelengths * u.nm)
+                )
+                spectra = atm_qe * flux_in_erg.value * (self.Signal / np.mean(flux_in_erg.value))
+                print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
+                spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
+                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                # if np.isfinite(length) & (np.ptp(a_ + b_)>0):
+                #     if self.Slitlength/self.pixel_scale<nsize:
+                #         self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
+                #     else:
+                #         self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
+                # else:
+                #     self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T
 
 
             else:
@@ -831,7 +841,7 @@ class Observation:
                     a = a[mask]
                     a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
                 elif "Salvato" in source:
-                    a = Table.read("Spectra/Salvato/%s.txt"%(source.split(" ")[1]),format="ascii")
+                    a = Table.read("Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[1]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
@@ -853,22 +863,27 @@ class Observation:
                 source_im_wo_atm=np.zeros((nsize2,nsize))
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
                 profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
-                # if np.isfinite(length) & ( np.ptp(a_ + b_)>0):
-                # sky_profile =   np.outer(atm_qe, (self.sky/self.exposure_time) * (a_ + b_) /  np.ptp(a_ + b_)>0 )
-
-                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
-                    if self.Slitlength/self.pixel_scale<nsize:
-                        self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
-                    else:
-                        self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
-                else:
-                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T
-
-
                 subim = np.zeros((nsize2,nsize))
+                source_im[:,:] +=  profile.T*     gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe    #self.atm_trans * QE
+
+            if np.isfinite(length) & (np.ptp(a_ + b_)>0):
+                if self.Slitlength/self.pixel_scale<nsize:
+                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
+                else:
+                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
+            else:
+                self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T                
+            # plt.figure()
+            # plt.imshow(self.sky_im)
+            # plt.colorbar(orientation="horizontal")
+            # plt.title("sum=%0.1E"%(self.sky_im.sum()))
+            # plt.show()
+            # print(self.sky_im.shape)
+
+
+
                 # self.sky_im[:,:] +=  sky_profile.T*    self.atm_trans * QE  #f(wavelengths)
                 # source_im[:,:] +=  profile.T*     np.convolve(f(wavelengths),  np.ones(int(self.diffuse_spectral_resolution/min_interval))/int(self.diffuse_spectral_resolution/min_interval),mode="same"       ) * self.atm_trans * QE
-                source_im[:,:] +=  profile.T*     gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * self.atm_trans * QE
                 #TODO this does not work when spectra because the ValueError: A value (4360.0) in x_new is above the interpolation range's maximum value (3277.23291015625).
                 # source_im[:,:] +=  (subim+profile).T*f(wavelengths) * self.atm_trans * QE
                 #TODO verify that we should convove the 2 things (the atm absorption and source). Physcally we should only convolve the product of the 2
@@ -1006,13 +1021,12 @@ class Observation:
             #TOKEEP  for cosmic ray masking readout[np.random.rand(source_im.shape[0], source_im.shape[1]) < self.cosmic_ray_loss_per_sec]=np.nan
             #print(np.max(((image + readout) * ConversionGain).round()))
         #     if np.max(((image + readout) * ConversionGain).round()) > 2 ** 15:
+        # TODO Maybe add the readnoise not in this function but in the ETC one
         imaADU_wo_RN = (image * ConversionGain).round().astype(type_)
         imaADU_RN = (readout * ConversionGain).round().astype(type_)
         imaADU = ((image + 1*readout) * ConversionGain).round().astype(type_)
         imaADU_without_source = ((image_without_source + 1*readout) * ConversionGain).round().astype(type_)
         imaADU_source = ((image_only_source + 0*readout) * ConversionGain).round().astype(type_)
-        # print(np.max(image_stack),np.max(readout_stack),ConversionGain,np.max(((image_stack + 1*readout_stack) * ConversionGain).round()))
-        # imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).round().astype(type_)
         imaADU_stack = ((image_stack + 1*readout_stack) * ConversionGain).astype(type_)
         imaADU_stack_only_source = ((image_stack_only_source + 0*readout_stack ) * ConversionGain).astype(type_) # TODO should I add + 1*readout_stack
         imaADU_stack_without_source = ((image_stack_without_source + 1*readout_stack ) * ConversionGain).astype(type_) # same
@@ -1021,10 +1035,8 @@ class Observation:
         else:
             imaADU_cube = imaADU_stack
         imaADU[imaADU>Full_well*1000] = np.nan
-        # print(np.ptp(imaADU_stack), np.ptp(imaADU_stack_only_source))
         return imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source#imaADU_wo_RN, imaADU_RN
-        # but on what part do you do the photon counting thing? on both?
-        # ishould just use it using self maybe?
+
 
 
 
