@@ -801,28 +801,26 @@ class Observation:
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
 
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-
-
             elif "blackbody" in source.lower():
-                blackbody_spectra = BlackBody(temperature=int(re.search(r'\d+', source).group())*u.K)(wavelengths * u.nm)
-                # Convert blackbody spectra to desired units: erg / (cm^2 * s * Å * arcsec^2)
+
+                temperature = int(re.search(r'\d+', source).group()) * u.K
+
+                # Définir le spectre de corps noir
+                blackbody_spectra = BlackBody(temperature=temperature)(wavelengths * u.nm)
+
+                # Convertir le spectre de corps noir en unités désirées: erg / (cm^2 * s * Å * arcsec^2)
                 flux_in_erg = blackbody_spectra.to(
                     u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
                     equivalencies=u.spectral_density(wavelengths * u.nm)
                 )
-                spectra = atm_qe * flux_in_erg.value * (self.Signal / np.mean(flux_in_erg.value))
-                print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
+                # Calculer le flux moyen en erg/cm²/s/Å/arcsec²
+                mean_flux_in_erg = np.mean(flux_in_erg.value)
+                # Ajuster le spectre du corps noir pour correspondre au flux moyen donné sur le détecteur
+                spectra = atm_qe * flux_in_erg.value * (flux / (mean_flux_in_erg))
+        
+                # print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
                 spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-                # if np.isfinite(length) & (np.ptp(a_ + b_)>0):
-                #     if self.Slitlength/self.pixel_scale<nsize:
-                #         self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
-                #     else:
-                #         self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
-                # else:
-                #     self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T
-
-
             else:
                 if "_" not in source:
                     flux_name,wave_name ="FLUX", "WAVELENGTH"
