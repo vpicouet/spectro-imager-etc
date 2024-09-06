@@ -681,11 +681,12 @@ class Observation:
 
 
 
-    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=200, Altitude=35,sky_lines=True):
+    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=200, Altitude=35,sky_lines=True,redshift=0):
         # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dard_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
         from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
         from scipy.sparse import dia_matrix
         from scipy.interpolate import interp1d
+        self.redshift=redshift
         for key in list(instruments["Charact."]) + ["Signal_el","N_images_true","Dark_current_f","sky"]:
             if hasattr(self,key ):
                 if (type(getattr(self,key)) != float) & (type(getattr(self,key)) != int) &  (type(getattr(self,key)) != np.float64):
@@ -795,35 +796,32 @@ class Observation:
         slit_profile = (a_ + b_) / np.ptp(a_ + b_)  # Shape: (100,)
 
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source)| ("Blackbody" in source):
+            # TODO should I replace PSF_x by PSF_x**2+Rx**2???? Issue with the normilization maybe... Need to compare to Bruno's code
+            spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
             if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
                 spectra = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
                 spectra *= atm_qe
-                spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
 
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
             elif "blackbody" in source.lower():
                 temperature = int(re.search(r'\d+', source).group()) * u.K
 
                 # Définir le spectre de corps noir
-                blackbody_spectra = BlackBody(temperature=temperature)(wavelengths * u.nm)
+                blackbody_spectra = BlackBody(temperature=temperature/(1+self.redshift))(wavelengths * u.nm)
 
                 # Convertir le spectre de corps noir en unités désirées: erg / (cm^2 * s * Å * arcsec^2)
                 flux_in_erg = blackbody_spectra.to(
                     u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
-                    equivalencies=u.spectral_density(wavelengths * u.nm)
-                )
-                # Calculer le flux moyen en erg/cm²/s/Å/arcsec²
-                mean_flux_in_erg = np.mean(flux_in_erg.value)
+                    equivalencies=u.spectral_density(wavelengths * u.nm))
                 # Ajuster le spectre du corps noir pour correspondre au flux moyen donné sur le détecteur
-                spectra = atm_qe * flux_in_erg.value * (flux / (mean_flux_in_erg))
-        
+                spectra = atm_qe * (flux_in_erg.value/np.mean(flux_in_erg.value)) * flux
                 # print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
-                spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                # spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
+                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
             else:
                 if "_" not in source:
                     flux_name,wave_name ="FLUX", "WAVELENGTH"
-                    fname = "h_%sfos_spc.fits"%(source.split(" ")[1])
+                    fname = "h_%sfos_spc.fits"%(source.split(" ")[2])
                     # print(fname)
                     try:
                         a = Table.read("Spectra/"+fname)
@@ -832,36 +830,36 @@ class Observation:
                     a["photons"] = a[flux_name]/9.93E-12   
                     a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
                 elif "COSMOS" in source:
-                    a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[1]),format="ascii")
+                    a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
+                    a[wave_name] = a[wave_name]*(1+self.redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
-                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
+                    a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
                 elif "Salvato" in source:
-                    a = Table.read("Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[1]),format="ascii")
+                    a = Table.read("Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
+                    a[wave_name] = a[wave_name]*(1+self.redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
-                    a["e_pix_sec"] = a[flux_name] * flux / np.nanmax(a[flux_name])
+                    a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
                 min_interval = np.nanmin(wavelengths[1:] - wavelengths[:-1])
-                # new_a = Table()
-                # new_range = np.arange(a[wave_name].min(), a[wave_name].max(), min_interval)
-                # new_a[wave_name] = new_range  
-                # new_a[flux_name] = np.interp(new_range, a[wave_name], a[flux_name])
-                # a=new_a
-                # print(new_a[flux_name],self.diffuse_spectral_resolution,min_interval,self.diffuse_spectral_resolution/min_interval)
-                # a[flux_name] = np.convolve(a[flux_name],np.ones(int(self.diffuse_spectral_resolution/min_interval))/int(self.diffuse_spectral_resolution/min_interval),mode="same")  
-
-
                 mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
                 slits = None #Table.read("Targets/2022/" + field).to_pandas()
-                source_im=np.zeros((nsize,nsize2))
+                # source_im=np.zeros((nsize,nsize2))
                 source_background=np.zeros((nsize,nsize2))
-                source_im_wo_atm=np.zeros((nsize2,nsize))
+                # source_im_wo_atm=np.zeros((nsize2,nsize))
                 f = interp1d(a[wave_name],a["e_pix_sec"])#
-                profile =   np.outer( np.ones(nsize2),  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum())
+                
+                # spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
+                # source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
+                spectra = gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe 
+                spatial_profile =  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) #/Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
+                # profile =   np.outer( spectra  ,spatial_profile )
                 subim = np.zeros((nsize2,nsize))
-                source_im[:,:] +=  profile.T*     gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe    #self.atm_trans * QE
+                # source_im[:,:] +=  profile.T    
+                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
+ 
 
             if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                 if self.Slitlength/self.pixel_scale<nsize:
