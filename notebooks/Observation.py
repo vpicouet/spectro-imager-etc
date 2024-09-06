@@ -802,7 +802,6 @@ class Observation:
 
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
             elif "blackbody" in source.lower():
-
                 temperature = int(re.search(r'\d+', source).group()) * u.K
 
                 # Définir le spectre de corps noir
