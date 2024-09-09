@@ -1090,7 +1090,7 @@ def fitswrite(fitsimage, filename, verbose=True, header=None):
 if __name__ == "__main__":
     # self = Observation()
     # imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
-    instruments.write("Instruments/instruments.csv")
+    instruments.write("Instruments/instruments.csv",overwrite=True)
     self = Observation( instrument="tREXS",Signal=0*1e-27,Sky=1e-15,Line_width=600,Slitlength=6)
     imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Baseline Spectra", size=[500, 100], OSregions=[0, 500], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=False,atmlambda=False,fraction_lya=0.05,sky_lines=True)#,Altitude=3
     if 1==1:
