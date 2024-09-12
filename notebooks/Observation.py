@@ -134,7 +134,7 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dard_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dard_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None):#,photon_kept=0.7#, flight_background_damping = 0.9
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=1.50,i=33,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=160,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
@@ -145,9 +145,9 @@ class Observation:
                 if getattr(self,key) is None:
                     setattr(self, key, float(val))
 
-        self.initilize()
+        self.initilize(IFS=IFS)
     
-    def initilize(self):
+    def initilize(self,IFS):
         self.precise = True
         # self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=self.Line_width,theta=0)(self.Δx,self.Δλ)
 
@@ -168,12 +168,14 @@ class Observation:
             self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
             # print("Factor spatial and spectral",  (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) ),   (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) ))
 
-        if ~np.isnan(self.Slitwidth).all() & self.precise:
+        if ~np.isnan(self.Slitwidth).all()  & (~self.IFS):  #& (self.precise)
             # assess flux fraction going through slit
-            self.flux_fraction_slit = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
-            self.flux_fraction_slit *= (1+erf(self.Slitlength/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
+            self.flux_fraction = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
+            self.flux_fraction *= (1+erf(self.Slitlength/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
+
         else:
-            self.flux_fraction_slit = 1
+            self.flux_fraction = 1
+        self.flux_fraction_slit_applied = self.flux_fraction
         # if self.smearing>0:
         # self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
         self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
@@ -216,17 +218,19 @@ class Observation:
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
-        # TODO verify that indeed it should not depend on self.pixel_scale**2 
+        # TODO verify that indeed it should not depend on self.pixel_scale**2 !! We still see some dependancy, why that??
         # Compute ratio to convert CU to el/pix 
-        if np.isnan(self.Slitwidth).all():
-            # If instrument is not a spectro?
-            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str *self.pixel_scale**2 #but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
-            self.factor_CU2el_sky = self.factor_CU2el
-        else:
-            # self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
-            self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
-            self.factor_CU2el_sky = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
-        
+        # if np.isnan(self.Slitwidth).all():
+        #     self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str *self.pixel_scale**2 #but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
+        #     self.factor_CU2el_sky = self.factor_CU2el
+        # else:
+        if self.IFS:
+            self.nfibers = (self.PSF_RMS_det * 2.35) / self.Slitwidth
+        else: # Because for IFS we keep all the flux (what does not enter a fiber will enter the next one). should normally account for a fill factor but this could appear in throughput
+            self.nfibers = 1
+        self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+        self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+
 
         self.sky = self.Sky_CU*self.factor_CU2el_sky*self.exposure_time  # el/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
@@ -241,10 +245,10 @@ class Observation:
         self.N_images_true = self.N_images * (1-self.cosmic_ray_loss)
         self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
         # if 1==0: # if line is totally resolved (for cosmic web for instance)
-        #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit_applied  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
         # else: # if line is unresolved for QSO for instance
-        self.Signal_el =  self.Signal_LU * self.factor_CU2el * self.exposure_time * self.flux_fraction_slit   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
-        # print(self.flux_fraction_slit)
+        self.Signal_el =  self.Signal_LU * self.factor_CU2el * self.exposure_time * self.flux_fraction_slit_applied   # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
+        # print(self.flux_fraction_slit_applied)
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
