@@ -161,6 +161,7 @@ class Observation:
         if type(self.Slitlength) == np.float64:
             if (self.Slitlength==self.Slitwidth):
                 self.Signal *= np.pi/4 # ratio between fiber disk and square slit
+        
         if self.precise: # TODO are we sure we should do that here?
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
