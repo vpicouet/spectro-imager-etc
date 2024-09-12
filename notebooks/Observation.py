@@ -219,15 +219,12 @@ class Observation:
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
         # TODO verify that indeed it should not depend on self.pixel_scale**2 !! We still see some dependancy, why that??
-        # Compute ratio to convert CU to el/pix 
-        # if np.isnan(self.Slitwidth).all():
-        #     self.factor_CU2el = self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)   * self.Bandwidth  * self.arcsec2str *self.pixel_scale**2 #but here it's total number of electrons we don't know if it is per A or not and so if we need to devide by dispersion: 1LU/A = .. /A. OK So we need to know if sky is LU or LU/A            
-        #     self.factor_CU2el_sky = self.factor_CU2el
-        # else:
         if self.IFS:
-            self.nfibers = (self.PSF_RMS_det * 2.35) / self.Slitwidth
+            self.nfibers = np.maximum(1,  (self.PSF_RMS_det * 2.35) / self.Slitwidth)
+            # self.nfibers = np.sqrt((self.PSF_RMS_det * 2.35)**2+self.Slitwidth**2)/(self.PSF_RMS_det * 2.35)
         else: # Because for IFS we keep all the flux (what does not enter a fiber will enter the next one). should normally account for a fill factor but this could appear in throughput
             self.nfibers = 1
+        # TODO need to verify that the evolution the sky and signal makes sense with nfibers...
         self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
         self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
 
