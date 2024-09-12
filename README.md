@@ -67,45 +67,68 @@ For integral field spectrographs (n=3 in spreadsheet, slicer or fiber IFU), the 
 The different instrument parameters used can all be used in the x-axis to analyze the impact on SNR.
 Their units description can also be found in the instrument spreadsheet (as remarks). As well as when the user put the cursor on each widget name.
 - **Source:** 
-  - **Flux**: erg/cm$^2$/s/arcsec$^2$/Å
-  - **Sky**: Level of sky background illumination in ergs/cm$^2$/s/arcsec$^2$/Å
-  - **Source extension**: Spatial extension of the source in arcseconds " (σ)
-  - **Source's line width**: Spectral extension of the source/emission line in Å
+  - **Flux** (F): erg/cm$^2$/s/arcsec$^2$/Å
+  - **Sky** (S): Level of sky background illumination in ergs/cm$^2$/s/arcsec$^2$/Å
+  - **Source extension** (σ$_x$): Spatial extension of the source in arcseconds " (σ)
+  - **Source's line width** (σ$_λ$): Spectral extension of the source/emission line in Å
 - **Observing strategy:** 
-  - **Observed wavelength**: Effective wavelength of the instrument in nanometer
-  - **Exposure time**: Exposure time of individual frames in seconds
-  - **Total acquisition time**: Total acquisition time in hours
-  - **Atmospheric transmission**:  %/100
-  - **Distance to source/line center**: Distance to the source being analyzed ['' or Å]
+  - **Observed wavelength** (λ): Effective wavelength of the instrument in nanometer
+  - **Exposure time** ($t_{exp}$): Exposure time of individual frames in seconds
+  - **Total acquisition time** ($Ttot$): Total acquisition time in hours
+  - **Atmospheric transmission** (Atm$_{\%}$):  %/100
+  - **Distance to source/line center** (Δ$_{x}$, Δ$_{y}$): Distance to the source being analyzed ['' or Å]
 - **Instrument design:** 
-  - **Collecting area**: Physical collecting area of the instrument in m$^2$
-  - **Plate scale**: Pixel plate scale in  ''/pix
-  - **Throughput**: Instrument throughput at effective wavelength (not accounting for detector quantum efficiency and atmospheric transmission)
-  - **Spatial resolution** (at the mask and at the detector): 
+  - **Collecting area** (A): Physical collecting area of the instrument in m$^2$
+  - **Plate scale** (P): Pixel plate scale in  ''/pix
+  - **Throughput** (T$_{\%}$): Instrument throughput at effective wavelength (not accounting for detector quantum efficiency and atmospheric transmission)
+  - **Spatial resolution** (R$_{mask}$,R$_{det}$): Respectively at the mask and at the detector
 - **Spectrograph design:** 
-  - **Spectral resolution**: Spectrograph spectral resolution λ[Å]/dλ[Å]
-  - **Slit width**: Width of the slit/slice/fiber in ''
-  - **Slit length**: Length of the slit/slice/fiber in ''
-  - **Dispersion**: Dispersion at the detector Å/pix 
+  - **Spectral resolution** (R$_λ$): Spectrograph spectral resolution λ[Å]/dλ[Å]
+  - **Slit width** (Sw): Width of the slit/slice/fiber in ''
+  - **Slit length** (Sl): Length of the slit/slice/fiber in ''
+  - **Dispersion** (d): Dispersion at the detector Å/pix 
+  - **IFS**: Convert the slit or fiber design into a slicer or fiber-IFS. This allows a 3D visualization. The impact on the noise is that the flux (sky or source) that is usually cut by a slit or single fiber is then transfered to the neighboring fibers/slices suppressing this loss factor.
 - **Detector parameters:** 
-  - **Quantum efficiency**: Detector quantum efficiency in %/100
-  - **Dark current**: Detector dark current [e-/pix/hour]
-  - **Read noise**: etector readout noise in electrons/pixel
-  - **Readout time**: Time in seconds that it takes for images to get read. Use 0 for MCPs or rolling shutter
-  - **Pixel size**: Pixel size in microns
-  - **Image loss due to cosmic ray**: Cosmic ray loss per second. eg. 0.01 would mean that 1 sec image looses 1\% pixels due to cosmic rays
-  - **extra_background**: Any additional source of straylight (could be any internal or external contribution/leak), in  addition to the nominal sky background
+  - **Quantum efficiency** (QE$_\%$): Detector quantum efficiency in %/100
+  - **Dark current** (D): Detector dark current [e-/pix/hour]
+  - **Read noise** (RN): Detector readout noise in electrons/pixel
+  - **Readout time** (t$_{RO}$): Time in seconds that it takes for images to get read. Use 0 for MCPs or rolling shutter
+  - **Pixel size** (P$_s$): Pixel size in microns
+  - **Image loss due to cosmic ray** (CR$_\%$): Cosmic ray loss per second. eg. 0.01 would mean that 1 sec image looses 1\% pixels due to cosmic rays
+  - **extra_background** (B): Any additional source of straylight (could be any internal or external contribution/leak), in  addition to the nominal sky background
 - **emCCD additional parameters:** 
-  - **EM gain**: EMCCD amplification gain in e-/e-
-  - **CIC**: EMCCD spurious charges due to amplification in electrons [e-/pix]
-  - **Smearing exponential length (~CTE)**: Smearing length of the EMCCD (exponential length in pixels). This length, representing the charge transfer efficiency is fixed by the temperature when the Temp checkbox is checked.
+  - **EM gain** (G): EMCCD amplification gain in e-/e-
+  - **CIC** (CIC): EMCCD spurious charges due to amplification in electrons [e-/pix]
+  - **Smearing exponential length** (CTE): Smearing length of the EMCCD (exponential length in pixels). This length, representing the charge transfer efficiency is fixed by the temperature when the Temp checkbox is checked.
   - **Thresholding**: [Yes/No] and the possibility to choose the threshold value in the presence of smearing (which reduces photon counting efficiency)
-  - **Temperature**: if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
+  - **Temperature** (T): if you check it (based on a first rough evolution of smearing and dark current with temperature, therefore changing the temperature will change smearing and dark accordingly.)
 - **Image simulator-related parameters:** Full well of the detector
-  - **Conversion gain**: to convert e- into detector ADU (ADU/e-)
-  - **Throughput FWHM**  taking into account all optics and QE, not atmosphere, to add the λ dependency.
-  - **Atmospheric transmission** [checkbox] to add a λ-depend transmission model (based on [pwv_kpno](https://mwvgroup.github.io/pwv_kpno/1.0.0/documentation/html/atmospheric_modeling.html)) for ground instruments (this only applies to the source, not to the sky emission)
-  - **Atmospheric emission lines**: checkbox] replaces a flat sky continuum by sky emission lines based on [UVES estimates](https://www.eso.org/observing/dfo/quality/UVES/pipeline/sky_spectrum.html) 
+  - **Conversion gain** (c$_g$): to convert e- into detector ADU (ADU/e-)
+  - **Throughput FWHM**  (FWHM$_{Th}$): taking into account all optics and QE, not atmosphere, to add the λ dependency.
+  - **Atmospheric transmission** [Yes/No] to add a λ-depend transmission model (based on [pwv_kpno](https://mwvgroup.github.io/pwv_kpno/1.0.0/documentation/html/atmospheric_modeling.html)) for ground instruments (this only applies to the source, not to the sky emission)
+  - **Atmospheric emission lines**: [Yes/No] replaces a flat sky continuum by sky emission lines based on [UVES estimates](https://www.eso.org/observing/dfo/quality/UVES/pipeline/sky_spectrum.html) 
+
+![alternative text](description/Parameters.jpg)
+
+
+
+# <center>Important Features </center>
+
+- Simplicity to add any instrument
+- Rapid computation
+- Works for almost any spectrograph or spectro-imager:
+  - Slit spectrograph
+  - Slitless spectrograph
+  - Prism spectrograph
+  - Fiber integral field spectrograph
+  - Slicer integral field spectrograph
+- Ability to add your own throughput spectra
+- For simplicity all the un-used parameters are hidden 
+- Ability to visualize the evolution of (noise, contributions, SNR, limiting surface brightness) with any parameter for tradeoff analysis or instrument/observation/reduction optimization
+- Save all the plots
+- Allows to compare instrument capability easily
+- Allows to understand easily how parameters drive observations
+  
 
 
 
@@ -113,7 +136,7 @@ Their units description can also be found in the instrument spreadsheet (as rema
 # <center>Contributions calculations in Electrons per pixel </center>
 
 ## Sky and signal
-The sky and signal contributions are first converted from $ergs/cm^2/s/asec^2/Å$ to photons/cm $^2$/s/sr/Å (continuum unit): $CU =   \frac{Flux}{\frac{h c}{ \lambda} \times \frac{\pi}{ 180 \times 3600}^2 }$
+The sky and signal contributions are first converted from $ergs/cm^2/s/asec^2/Å$ to photons/cm $^2$/s/sr/Å (continuum unit): $CU =   \frac{F}{\frac{h c}{ \lambda} \times \frac{\pi}{ 180 \times 3600}^2 }$
 
 Note the wavelength dependency in the formula. 
 We decided deliberately to use flux per Angstrom with a gaussian profile so that the user can simulate both a continuum or an unresolved line. 
@@ -121,9 +144,9 @@ Users can also directly upload spectra in  $ergs/cm^2/s/asec^2/Å$ in the GitHub
 
 Then, both contributions are converted similarly into electrons per pixels:
 
-$$Sky_{e-/pix/exp} = Sky_{CU} \times Slitwidth_{str}  \times Dispersion_{Å/pix}  \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
+$$S_{e-/pix/exp} = S_{CU} \times Sw_{str}  \times d_{Å/pix}  \times texp_{s} \times Atm_{٪} \times  A_{\%} \times T_{\%}  \times QE_{\%}  $$
 
-$$Signal_{e-/pix/exp} = Signal_{CU} \times min(Slitwidth_{str},SourceSize_{str})  \times Dispersion_{Å/pix} \times Texp_{s} \times Atm_{٪} \times  Area_{٪} \times Throughput_{٪}  \times QE_{٪}  $$
+$$S_{e-/pix/exp} = S_{CU} \times min(Sw_{str},σx_{str})  \times d_{Å/pix} \times texp_{s} \times A_{\%} \times  Area_{\%} \times T_{\%}\times QE_{\%}  $$
 
 <!-- If the instrument is an imager (no slit and no dispersion), we replace the factor $ Slitwidth_{str}  \times Dispersion_{Å/pix}$ by $FOV_{str} \times Bandwidth_{Å} $. -->
 
@@ -132,7 +155,7 @@ $$Signal_{e-/pix/exp} = Signal_{CU} \times min(Slitwidth_{str},SourceSize_{str})
 Other contributions (dark current, read-noise, CIC, straylight) are easier to account for.
 Dark and straylight are used with the same unit: $e-/pix/hour$. Therefore:
 
-$Dark_{e-/pix/exp} = Dark_{e-/pix/hour} \times \frac{ Texp_{s} }{3600}$
+$D_{e-/pix/exp} = D_{e-/pix/hour} \times \frac{ texp_{s} }{3600}$
 
 CIC (Clock induced charges) which are charges induced in electron amplified CCD, are already given in e-/pix/exp.
 Read noise is usually also given in e-/pix/exp.
@@ -146,10 +169,10 @@ $N_{Contribution} = \sqrt{Contribution [\times ENF] \times N_{images} \times Siz
 
 The number of effective images is:
 
-$$N_{images} = \frac{Ttot_{s}}{Texp_{s} + Tread_{s}} \times (1-CRloss_{٪}) $$
+$$N_{images} = \frac{Ttot_{s}}{texp_{s} + tro_{s}} \times (1-CR_{\%}) $$
 
 In the case of electron-amplified CCDs, some considerations must be taken into account:
-- the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{EMGain_{e-/e-}}$
+- the read noise must be divided by the amplification gain: $RN_{e-/pix/exp} = \frac{ RN_{e-/pix/exp} }{G_{e-/e-}}$
 - an excess noise factor of $\sqrt{2}$  must be used to account for the stochastic amplification (if no thresholding method is applied)
 
 
