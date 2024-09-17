@@ -144,9 +144,9 @@ Users can also directly upload spectra in  $ergs/cm^2/s/asec^2/Å$ in the GitHub
 
 Then, both contributions are converted similarly into electrons per pixels:
 
-$$S_{e-/pix/exp} = S_{CU} \times Sw_{str}  \times d_{Å/pix}  \times texp_{s} \times Atm_{٪} \times  A_{\%} \times T_{\%}  \times QE_{\%}  $$
+$$S_{e-/pix/exp} = S_{CU} \times Sw_{str}  \times d_{\AA/pix}  \times texp_{s} \times Atm_{٪} \times  A_{\%} \times T_{\%}  \times QE_{\%}  $$
 
-$$S_{e-/pix/exp} = S_{CU} \times min(Sw_{str},σx_{str})  \times d_{Å/pix} \times texp_{s} \times A_{\%} \times  Area_{\%} \times T_{\%}\times QE_{\%}  $$
+$$S_{e-/pix/exp} = S_{CU} \times min(Sw_{str},σx_{str})  \times d_{\AA/pix} \times texp_{s} \times A_{\%} \times  Area_{\%} \times T_{\%}\times QE_{\%}  $$
 
 <!-- If the instrument is an imager (no slit and no dispersion), we replace the factor $ Slitwidth_{str}  \times Dispersion_{Å/pix}$ by $FOV_{str} \times Bandwidth_{Å} $. -->
 
