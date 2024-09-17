@@ -144,7 +144,7 @@ Users can also directly upload spectra in  $ergs/cm^2/s/asec^2/Å$ in the GitHub
 
 Then, both contributions are converted similarly into electrons per pixels:
 
-$$S_{e-/pix/exp} = S_{CU} \times Sw_{str}  \times d_{\AA/pix}  \times texp_{s} \times Atm_{٪} \times  A_{\%} \times T_{\%}  \times QE_{\%}  $$
+$$S_{e-/pix/exp} = S_{CU} \times Sw_{str}  \times d_{\AA/pix}  \times texp_{s} \times Atm_{٪} \times  A_{٪} \times T_{\%}  \times QE_{٪}  $$
 
 $$S_{e-/pix/exp} = S_{CU} \times min(Sw_{str},σx_{str})  \times d_{\AA/pix} \times texp_{s} \times A_{\%} \times  Area_{\%} \times T_{\%}\times QE_{\%}  $$
 
