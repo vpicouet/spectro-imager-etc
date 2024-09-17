@@ -177,6 +177,7 @@ In the case of electron-amplified CCDs, some considerations must be taken into a
 
 
 
+
 ![alternative text](description/Chart.jpg)
 
 

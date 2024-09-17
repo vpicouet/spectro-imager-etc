@@ -173,7 +173,6 @@ class Observation:
             # assess flux fraction going through slit
             self.flux_fraction = (1+erf(self.Slitwidth/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
             self.flux_fraction *= (1+erf(self.Slitlength/(2*np.sqrt(2)*self.PSF_RMS_mask)))-1
-
         else:
             self.flux_fraction = 1
         self.flux_fraction_slit_applied = self.flux_fraction
@@ -220,6 +219,7 @@ class Observation:
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
         # TODO verify that indeed it should not depend on self.pixel_scale**2 !! We still see some dependancy, why that??
+        # [ ] add this
         if self.IFS:
             self.nfibers = np.maximum(1,  (self.PSF_RMS_det * 2.35) / self.Slitwidth)
             # self.nfibers = np.sqrt((self.PSF_RMS_det * 2.35)**2+self.Slitwidth**2)/(self.PSF_RMS_det * 2.35)
