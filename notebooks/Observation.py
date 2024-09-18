@@ -936,6 +936,7 @@ class Observation:
         stack = int(self.N_images_true)
         cube_stack = -np.ones((stack,size[1], size[0]), dtype="int32")
 
+
         n_smearing=6
         if (self.EM_gain>1) & (self.CIC_charge>0):
             image[:, OSregions[0] : OSregions[1]] += np.random.gamma( np.random.poisson(source_im) + np.array(np.random.rand(size[1], OSregions[1]-OSregions[0])<self.CIC_charge,dtype=int) , self.EM_gain)
