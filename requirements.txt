@@ -16,7 +16,7 @@ Pillow
 cycler
 nbimporter
 specsim
-lxml_html_clean
+# lxml_html_clean
 ipykernel
 
 # plotly
