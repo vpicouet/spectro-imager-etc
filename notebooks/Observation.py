@@ -740,7 +740,7 @@ class Observation:
 
         if ("FIREBall" in self.instrument) | ("SCWI" in self.instrument): #UV absrption
             trans = Table.read("interpolate/transmission_pix_resolution.csv")
-            QE = Table.read("interpolate/QE_2022.csv")
+            QE = Table.read("interpolate/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
             QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
             # trans["trans_conv"] = np.convolve(trans["col2"],np.ones(int(resolution_atm))/int(resolution_atm),mode="same")
