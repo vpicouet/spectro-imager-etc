@@ -771,19 +771,17 @@ class Observation:
         # TODO should we really devide by atmosphere?
         atm_qe_normalized_shape =  np.ones(nsize2) * self.atm_trans * self.Throughput_curve #/ (self.QE*self.Atmosphere) 
 
-        if (Altitude<10) & (wavelengths.min()>3141) & (wavelengths.max()<10425) & (sky_lines):
+        if (Altitude<100)  & (wavelengths.max()<10425) & (sky_lines):   #& (wavelengths.min()>3141)
             if os.path.exists("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_"))):
                 sky_lines = Table.read("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_")))
             else:
                 sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
-            mask = (sky_lines[sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
-            # print("%i lines in the total number of lines: %i"%(len(sky_lines[mask]),len(sky_lines)))
-            sky_lines = sky_lines[mask]
+                mask = (sky_lines[sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
+                sky_lines = sky_lines[mask]
 
             sky = interp1d(sky_lines[sky_lines.colnames[0]],sky_lines[sky_lines.colnames[1]])(wavelengths)
             self.final_sky_before_convolution = (self.sky/self.exposure_time) * sky * (self.Sky/1e-16) #/np.mean(self.sky)   # 
-            # self.final_sky = np.convolve(self.final_sky,np.ones(int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])))/int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])),mode="same")  
-            self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0]))
+            self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/(sky_lines[sky_lines.colnames[0]][1]-sky_lines[sky_lines.colnames[0]][0]))
 
         else:
             self.final_sky_before_convolution = self.sky/self.exposure_time*np.ones(nsize2)
