@@ -112,10 +112,10 @@ type_="" #"new_" #""
 #new is for when we don't use fraction and use RN (false I think), "" is with fraction true positives and RN/gain, seems better 
 path=""
 # path = "/Users/Vincent/Github/fireball2-etc/notebooks/"
-table_threshold = fits.open(path+"interpolate/%sthreshold_%s.fits"%(type_,n))[0].data
-table_snr = fits.open(path+"interpolate/%ssnr_max_%s.fits"%(type_,n))[0].data
-table_fraction_rn = fits.open(path+"interpolate/%sfraction_rn_%s.fits"%(type_,n))[0].data
-table_fraction_flux = fits.open(path+"interpolate/%sfraction_flux_%s.fits"%(type_,n))[0].data
+table_threshold = fits.open(path+"Instruments_throughput/EMCCD/%sthreshold_%s.fits"%(type_,n))[0].data
+table_snr = fits.open(path+"Instruments_throughput/EMCCD/%ssnr_max_%s.fits"%(type_,n))[0].data
+table_fraction_rn = fits.open(path+"Instruments_throughput/EMCCD/%sfraction_rn_%s.fits"%(type_,n))[0].data
+table_fraction_flux = fits.open(path+"Instruments_throughput/EMCCD/%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
@@ -738,8 +738,8 @@ class Observation:
         # nsize,nsize2 = 100,500
         wavelengths = np.linspace(wave_min,wave_max,nsize2)
 
-        if os.path.exists("interpolate/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
-            QE = Table.read("interpolate/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
+        if os.path.exists("Instruments_throughput/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
+            QE = Table.read("Instruments_throughput/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
             QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
             self.Throughput_curve = QE(wavelengths)/np.nanmax(QE(wavelengths))  if QElambda else Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )
         else:
@@ -747,7 +747,7 @@ class Observation:
 
 
         if ("FIREBall" in self.instrument) | ("SCWI" in self.instrument): #UV absrption
-            trans = Table.read("interpolate/transmission_pix_resolution.csv")
+            trans = Table.read("Atm_transmission/transmission_pix_resolution.csv")
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
             trans["trans_conv"] = gaussian_filter1d(trans["col2"], resolution_atm/2.35)
             self.atm_trans_before_convolution =  interp1d(list(trans["col1"]*10),list(trans["col2"]))(wavelengths)
@@ -757,8 +757,8 @@ class Observation:
             self.atm_trans = self.atm_trans/np.nanmax(self.atm_trans)   if (atmlambda & (Altitude<100) ) else 1#self.Atmosphere
 
         elif Altitude<10: # only for ground instruments (based on altitude column)
-            # trans = Table.read("interpolate/transmission_ground.csv")
-            trans = Table.read("interpolate/pwv_atm_combined_ground.csv")
+            # trans = Table.read("Atm_transmission/transmission_ground.csv")
+            trans = Table.read("Atm_transmission/pwv_atm_combined_ground.csv")
             # trans["wave_microns"] = trans["wavelength"]/1000
             self.atm_trans_before_convolution =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))(wavelengths)
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
