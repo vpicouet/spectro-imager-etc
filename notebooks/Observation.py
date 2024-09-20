@@ -112,10 +112,10 @@ type_="" #"new_" #""
 #new is for when we don't use fraction and use RN (false I think), "" is with fraction true positives and RN/gain, seems better 
 path=""
 # path = "/Users/Vincent/Github/fireball2-etc/notebooks/"
-table_threshold = fits.open(path+"Instruments_throughput/EMCCD/%sthreshold_%s.fits"%(type_,n))[0].data
-table_snr = fits.open(path+"Instruments_throughput/EMCCD/%ssnr_max_%s.fits"%(type_,n))[0].data
-table_fraction_rn = fits.open(path+"Instruments_throughput/EMCCD/%sfraction_rn_%s.fits"%(type_,n))[0].data
-table_fraction_flux = fits.open(path+"Instruments_throughput/EMCCD/%sfraction_flux_%s.fits"%(type_,n))[0].data
+table_threshold = fits.open(path+"Instruments/EMCCD/%sthreshold_%s.fits"%(type_,n))[0].data
+table_snr = fits.open(path+"Instruments/EMCCD/%ssnr_max_%s.fits"%(type_,n))[0].data
+table_fraction_rn = fits.open(path+"Instruments/EMCCD/%sfraction_rn_%s.fits"%(type_,n))[0].data
+table_fraction_flux = fits.open(path+"Instruments/EMCCD/%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
@@ -738,16 +738,17 @@ class Observation:
         # nsize,nsize2 = 100,500
         wavelengths = np.linspace(wave_min,wave_max,nsize2)
 
-        if os.path.exists("Instruments_throughput/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
-            QE = Table.read("Instruments_throughput/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
-            QE = interp1d(QE["wave"]*10,QE["QE_corr"])#
+        if os.path.exists("Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
+            QE = Table.read("Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
+            QE = interp1d(QE[QE.colnames[0]]*10,QE[QE.colnames[1]])#
             self.Throughput_curve = QE(wavelengths)/np.nanmax(QE(wavelengths))  if QElambda else Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )
         else:
             self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
 
-
-        if ("FIREBall" in self.instrument) | ("SCWI" in self.instrument): #UV absrption
-            trans = Table.read("Atm_transmission/transmission_pix_resolution.csv")
+        if os.path.exists("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_"))):
+        # if ("FIREBall" in self.instrument) | ("SCWI" in self.instrument): #UV absrption
+            # trans = Table.read("Atm_transmission/transmission_pix_resolution.csv")
+            trans = Table.read("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_")))
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
             trans["trans_conv"] = gaussian_filter1d(trans["col2"], resolution_atm/2.35)
             self.atm_trans_before_convolution =  interp1d(list(trans["col1"]*10),list(trans["col2"]))(wavelengths)
@@ -768,12 +769,10 @@ class Observation:
             # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
             self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution/np.nanmax(self.atm_trans_before_convolution),resolution_atm/2.35)       if atmlambda else 1 #self.Atmosphere
             # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
-
-
             # plt.figure();plt.plot(wavelengths,QE);plt.title("throughtput_fwhm: %f"%(Throughput_FWHM));plt.xlabel("Angstrom");plt.show()
         else:
-            self.atm_trans_before_convolution = self.Atmosphere
-            self.atm_trans = self.Atmosphere
+            self.atm_trans_before_convolution = 1#self.Atmosphere
+            self.atm_trans = 1#self.Atmosphere
             # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
             # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
         # TODO should we really devide by atmosphere?
