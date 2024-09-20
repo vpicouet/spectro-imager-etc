@@ -747,8 +747,10 @@ class Observation:
             trans["trans_conv"] = gaussian_filter1d(trans["col2"], resolution_atm/2.35)
             self.atm_trans_before_convolution =  interp1d(list(trans["col1"]*10),list(trans["col2"]))(wavelengths)
             self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution, resolution_atm/2.35)
-            self.QE_curve = QE(wavelengths)  if QElambda else self.QE
-            self.atm_trans = self.atm_trans   if (atmlambda & (Altitude<100) ) else self.Atmosphere
+            # self.Throughput_curve = QE(wavelengths)  if QElambda else Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )
+            # self.atm_trans = self.atm_trans   if (atmlambda & (Altitude<100) ) else self.Atmosphere
+            self.Throughput_curve = QE(wavelengths)/np.nanmax(QE(wavelengths))  if QElambda else Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )
+            self.atm_trans = self.atm_trans/np.nanmax(self.atm_trans)   if (atmlambda & (Altitude<100) ) else 1#self.Atmosphere
 
         elif Altitude<10: # only for ground instruments (based on altitude column)
             # trans = Table.read("interpolate/transmission_ground.csv")
@@ -758,19 +760,20 @@ class Observation:
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
             #convolve based on resolution
             # self.atm_trans = np.convolve(self.atm_trans(wavelengths),np.ones(int(resolution_atm))/int(resolution_atm),mode="same")       if atmlambda else self.Atmosphere
-            self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution,resolution_atm/2.35)       if atmlambda else self.Atmosphere
-            self.QE_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
-            # plt.figure()
-            # plt.plot(wavelengths,QE)
-            # plt.title("throughtput_fwhm: %f"%(Throughput_FWHM))
-            # plt.xlabel("Angstrom")
-            # plt.show()
+            # self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution,resolution_atm/2.35)       if atmlambda else self.Atmosphere
+            # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
+            self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution/np.nanmax(self.atm_trans_before_convolution),resolution_atm/2.35)       if atmlambda else 1 #self.Atmosphere
+            self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
+
+
+            # plt.figure();plt.plot(wavelengths,QE);plt.title("throughtput_fwhm: %f"%(Throughput_FWHM));plt.xlabel("Angstrom");plt.show()
         else:
             self.atm_trans_before_convolution = self.Atmosphere
             self.atm_trans = self.Atmosphere
-            self.QE_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
+            # self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )  if QElambda else self.QE
+            self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
         # TODO should we really devide by atmosphere?
-        atm_qe =  np.ones(nsize2) * self.atm_trans * self.QE_curve / (self.QE*self.Atmosphere) 
+        atm_qe_normalized_shape =  np.ones(nsize2) * self.atm_trans * self.Throughput_curve #/ (self.QE*self.Atmosphere) 
 
         if (Altitude<10) & (wavelengths.min()>3141) & (wavelengths.max()<10425) & (sky_lines):
             sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
@@ -782,17 +785,11 @@ class Observation:
             self.final_sky_before_convolution = (self.sky/self.exposure_time) * sky * (self.Sky/1e-16) #/np.mean(self.sky)   # 
             # self.final_sky = np.convolve(self.final_sky,np.ones(int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])))/int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])),mode="same")  
             self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0]))
-            # print(self.sky/self.exposure_time,self.Sky)
-            # print(sky.min(),sky.min(),self.final_sky.min(),self.final_sky.max())
 
-            # self.final_sky = self.sky/self.exposure_time*np.ones(nsize2)
         else:
             self.final_sky_before_convolution = self.sky/self.exposure_time*np.ones(nsize2)
             self.final_sky = self.sky/self.exposure_time*np.ones(nsize2)
-            # plt.figure()
-            # plt.plot(wavelengths,self.final_sky)
-            # plt.show()
-        # length = min(self.Slitlength/2/self.pixel_scale,nsize/2-1)
+
         length = self.Slitlength/2/self.pixel_scale
         a_ = special.erf((length - (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
         b_ = special.erf((length + (np.linspace(0,nsize,nsize) - nsize/2)) / np.sqrt(2 * Rx ** 2))
@@ -803,7 +800,7 @@ class Observation:
             spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
             if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
                 spectra = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
-                spectra *= atm_qe
+                spectra *= atm_qe_normalized_shape   #* self.QE*self.Atmosphere
 
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
             elif "blackbody" in source.lower():
@@ -817,7 +814,7 @@ class Observation:
                     u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
                     equivalencies=u.spectral_density(wavelengths * u.nm))
                 # Ajuster le spectre du corps noir pour correspondre au flux moyen donné sur le détecteur
-                spectra = atm_qe * (flux_in_erg.value/np.mean(flux_in_erg.value)) * flux
+                spectra = atm_qe_normalized_shape  * (flux_in_erg.value/np.mean(flux_in_erg.value)) * flux    #* self.QE*self.Atmosphere
                 # print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
                 # spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
@@ -831,7 +828,9 @@ class Observation:
                     except FileNotFoundError: 
                         a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
                     a["photons"] = a[flux_name]/9.93E-12   
-                    a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
+                    # TODO why there is no QE in the formula??
+                    # a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
+                    a["e_pix_sec"]  = flux * a["photons"] / np.nanmax(a["photons"])
                 elif "COSMOS" in source:
                     a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
@@ -848,35 +847,24 @@ class Observation:
                     a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
                 min_interval = np.nanmin(wavelengths[1:] - wavelengths[:-1])
                 mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
-                slits = None #Table.read("Targets/2022/" + field).to_pandas()
-                # source_im=np.zeros((nsize,nsize2))
+                slits = None 
                 source_background=np.zeros((nsize,nsize2))
-                # source_im_wo_atm=np.zeros((nsize2,nsize))
-                f = interp1d(a[wave_name],a["e_pix_sec"])#
+                f = interp1d(a[wave_name],a["e_pix_sec"])
                 
-                # spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-                # source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
-                spectra = gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe 
+                spectra = gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe_normalized_shape      #* self.QE*self.Atmosphere
                 spatial_profile =  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) #/Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
-                # profile =   np.outer( spectra  ,spatial_profile )
                 subim = np.zeros((nsize2,nsize))
-                # source_im[:,:] +=  profile.T    
                 source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
  
 
             if np.isfinite(length) & (np.ptp(a_ + b_)>0):
                 if self.Slitlength/self.pixel_scale<nsize:
-                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, slit_profile ).T
+                    self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, slit_profile ).T
                 else:
-                    self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE,  np.ones(nsize) / nsize ).T
+                    self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE,  np.ones(nsize) / nsize ).T
             else:
-                self.sky_im =   np.outer(self.final_sky * self.QE_curve /self.QE, np.ones(size[1])   ).T                
-            # plt.figure()
-            # plt.imshow(self.sky_im)
-            # plt.colorbar(orientation="horizontal")
-            # plt.title("sum=%0.1E"%(self.sky_im.sum()))
-            # plt.show()
-            # print(self.sky_im.shape)
+                self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, np.ones(size[1])   ).T                
+            # plt.figure();plt.imshow(self.sky_im);plt.colorbar(orientation="horizontal");plt.title("sum=%0.1E"%(self.sky_im.sum()));plt.show()
 
 
 
