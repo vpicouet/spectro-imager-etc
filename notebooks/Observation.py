@@ -727,15 +727,10 @@ class Observation:
         flux = (self.Signal_el /self.exposure_time)
         Rx = self.PSF_RMS_det/self.pixel_scale
         PSF_x = np.sqrt((np.nanmin([self.PSF_source/self.pixel_scale,self.Slitlength/self.pixel_scale]))**2 + (Rx)**2)
-        # PSF_x = np.sqrt((self.PSF_source/self.pixel_scale)**2 + (Rx)**2)
-        # PSF_λ = np.sqrt(self.PSF_lambda_pix**2 + (self.Line_width/self.dispersion)**2)
         PSF_λ = np.sqrt((self.diffuse_spectral_resolution/self.dispersion)**2 + (self.Line_width/self.dispersion)**2)
-                    
-        # nsize,nsize2 = size[1],size[0]
+
         wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
-        # wavelengths = np.linspace(lmax-nsize2/2*self.dispersion,lmax+nsize2/2*self.dispersion,nsize2)
         nsize2, nsize = size
-        # nsize,nsize2 = 100,500
         wavelengths = np.linspace(wave_min,wave_max,nsize2)
 
         if os.path.exists("Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
@@ -746,12 +741,10 @@ class Observation:
             self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
 
         if os.path.exists("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_"))):
-        # if ("FIREBall" in self.instrument) | ("SCWI" in self.instrument): #UV absrption
-            # trans = Table.read("Atm_transmission/transmission_pix_resolution.csv")
             trans = Table.read("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_")))
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
-            trans["trans_conv"] = gaussian_filter1d(trans["col2"], resolution_atm/2.35)
-            self.atm_trans_before_convolution =  interp1d(list(trans["col1"]*10),list(trans["col2"]))(wavelengths)
+            trans["trans_conv"] = gaussian_filter1d(trans[trans.colnames[0]], resolution_atm/2.35)
+            self.atm_trans_before_convolution =  interp1d(list(trans[trans.colnames[0]]*10),list(trans[trans.colnames[1]]))(wavelengths)
             self.atm_trans = gaussian_filter1d(self.atm_trans_before_convolution, resolution_atm/2.35)
             # self.Throughput_curve = QE(wavelengths)  if QElambda else Gaussian1D.evaluate(wavelengths,  self.QE,  self.wavelength*10, Throughput_FWHM )
             # self.atm_trans = self.atm_trans   if (atmlambda & (Altitude<100) ) else self.Atmosphere
@@ -779,12 +772,15 @@ class Observation:
         atm_qe_normalized_shape =  np.ones(nsize2) * self.atm_trans * self.Throughput_curve #/ (self.QE*self.Atmosphere) 
 
         if (Altitude<10) & (wavelengths.min()>3141) & (wavelengths.max()<10425) & (sky_lines):
-            sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
-            mask = (sky_lines["wavelength"]>wavelengths.min()-10*self.dispersion) & (sky_lines["wavelength"]<wavelengths.max()+10*self.dispersion)
+            if os.path.exists("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_"))):
+                sky_lines = Table.read("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_")))
+            else:
+                sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
+            mask = (sky_lines[sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
             # print("%i lines in the total number of lines: %i"%(len(sky_lines[mask]),len(sky_lines)))
             sky_lines = sky_lines[mask]
 
-            sky = interp1d(sky_lines["wavelength"],sky_lines["flux"])(wavelengths)
+            sky = interp1d(sky_lines[sky_lines.colnames[0]],sky_lines[sky_lines.colnames[1]])(wavelengths)
             self.final_sky_before_convolution = (self.sky/self.exposure_time) * sky * (self.Sky/1e-16) #/np.mean(self.sky)   # 
             # self.final_sky = np.convolve(self.final_sky,np.ones(int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])))/int(self.diffuse_spectral_resolution/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0])),mode="same")  
             self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/(sky_lines["wavelength"][1]-sky_lines["wavelength"][0]))
