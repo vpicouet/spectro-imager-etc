@@ -36,7 +36,7 @@ try:
     instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
     instruments = Table.from_pandas(instruments_pandas)
 except Exception:
-    instruments = Table.read("Instruments/instruments.csv")
+    instruments = Table.read("../data/Instruments/instruments.csv")
 instruments = instruments[instruments.colnames]
 instruments
 instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
@@ -112,10 +112,10 @@ type_="" #"new_" #""
 #new is for when we don't use fraction and use RN (false I think), "" is with fraction true positives and RN/gain, seems better 
 path=""
 # path = "/Users/Vincent/Github/fireball2-etc/notebooks/"
-table_threshold = fits.open(path+"Instruments/EMCCD/%sthreshold_%s.fits"%(type_,n))[0].data
-table_snr = fits.open(path+"Instruments/EMCCD/%ssnr_max_%s.fits"%(type_,n))[0].data
-table_fraction_rn = fits.open(path+"Instruments/EMCCD/%sfraction_rn_%s.fits"%(type_,n))[0].data
-table_fraction_flux = fits.open(path+"Instruments/EMCCD/%sfraction_flux_%s.fits"%(type_,n))[0].data
+table_threshold = fits.open(path+"../data/Instruments/EMCCD/%sthreshold_%s.fits"%(type_,n))[0].data
+table_snr = fits.open(path+"../data/Instruments/EMCCD/%ssnr_max_%s.fits"%(type_,n))[0].data
+table_fraction_rn = fits.open(path+"../data/Instruments/EMCCD/%sfraction_rn_%s.fits"%(type_,n))[0].data
+table_fraction_flux = fits.open(path+"../data/Instruments/EMCCD/%sfraction_flux_%s.fits"%(type_,n))[0].data
 
 
 
@@ -733,15 +733,15 @@ class Observation:
         nsize2, nsize = size
         wavelengths = np.linspace(wave_min,wave_max,nsize2)
 
-        if os.path.exists("Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
-            QE = Table.read("Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
+        if os.path.exists("../data/Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
+            QE = Table.read("../data/Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
             QE = interp1d(QE[QE.colnames[0]]*10,QE[QE.colnames[1]])#
             self.Throughput_curve = QE(wavelengths)/np.nanmax(QE(wavelengths))  if QElambda else Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )
         else:
             self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
 
-        if os.path.exists("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_"))):
-            trans = Table.read("Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_")))
+        if os.path.exists("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_"))):
+            trans = Table.read("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_")))
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
             trans["trans_conv"] = gaussian_filter1d(trans[trans.colnames[0]], resolution_atm/2.35)
             self.atm_trans_before_convolution =  interp1d(list(trans[trans.colnames[0]]*10),list(trans[trans.colnames[1]]))(wavelengths)
@@ -752,7 +752,7 @@ class Observation:
 
         elif Altitude<10: # only for ground instruments (based on altitude column)
             # trans = Table.read("Atm_transmission/transmission_ground.csv")
-            trans = Table.read("Atm_transmission/pwv_atm_combined_ground.csv")
+            trans = Table.read("../data/Atm_transmission/pwv_atm_combined_ground.csv")
             # trans["wave_microns"] = trans["wavelength"]/1000
             self.atm_trans_before_convolution =  interp1d(list(trans["wave_microns"]*1000), list(trans["transmission"]))(wavelengths)
             resolution_atm = self.diffuse_spectral_resolution/(wavelengths[1]-wavelengths[0])
@@ -772,10 +772,10 @@ class Observation:
         atm_qe_normalized_shape =  np.ones(nsize2) * self.atm_trans * self.Throughput_curve #/ (self.QE*self.Atmosphere) 
 
         if (Altitude<100)  & (wavelengths.max()<10425) & (sky_lines):   #& (wavelengths.min()>3141)
-            if os.path.exists("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_"))):
-                sky_lines = Table.read("Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_")))
+            if os.path.exists("../data/Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_"))):
+                sky_lines = Table.read("../data/Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_")))
             else:
-                sky_lines = Table.read("Sky_emission_lines/spectra_0.2A.csv")
+                sky_lines = Table.read("../data/Sky_emission_lines/spectra_0.2A.csv")
                 mask = (sky_lines[sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
                 sky_lines = sky_lines[mask]
 
@@ -821,7 +821,7 @@ class Observation:
                     fname = "h_%sfos_spc.fits"%(source.split(" ")[2])
                     # print(fname)
                     try:
-                        a = Table.read("Spectra/"+fname)
+                        a = Table.read("../data/Spectra/"+fname)
                     except FileNotFoundError: 
                         a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
                     a["photons"] = a[flux_name]/9.93E-12   
@@ -829,14 +829,14 @@ class Observation:
                     # a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
                     a["e_pix_sec"]  = flux * a["photons"] / np.nanmax(a["photons"])
                 elif "COSMOS" in source:
-                    a = Table.read("Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
+                    a = Table.read("../data/Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
                     a[wave_name] = a[wave_name]*(1+self.redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
                     a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
                 elif "Salvato" in source:
-                    a = Table.read("Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
+                    a = Table.read("../data/Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
                     a[wave_name] = a[wave_name]*(1+self.redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
@@ -1079,7 +1079,7 @@ def fitswrite(fitsimage, filename, verbose=True, header=None):
 if __name__ == "__main__":
     # self = Observation()
     # imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05)
-    instruments.write("Instruments/instruments.csv",overwrite=True)
+    instruments.write("../data/Instruments/instruments.csv",overwrite=True)
     self = Observation( instrument="tREXS",Signal=0*1e-27,Sky=1e-15,Line_width=600,Slitlength=6)
     imaADU, imaADU_stack, imaADU_cube, source_im, source_im_wo_atm, imaADU_stack_only_source, imaADU_without_source, imaADU_stack_without_source, imaADU_source = self.SimulateFIREBallemCCDImage(Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Baseline Spectra", size=[500, 100], OSregions=[0, 500], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=False,atmlambda=False,fraction_lya=0.05,sky_lines=True)#,Altitude=3
     if 1==1:
