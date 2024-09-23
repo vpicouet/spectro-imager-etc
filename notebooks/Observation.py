@@ -256,6 +256,7 @@ class Observation:
         self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
         self.SNR = self.Signal_resolution / self.Total_noise_final
+        self.snrs_per_pixel = self.Signal_el * self.N_images_true /   (self.Total_noise_final / self.resolution_element / np.sqrt(self.N_resol_element_A)) 
         
         if type(self.Total_noise_final + self.Signal_resolution) == np.float64:
             n=0
@@ -268,7 +269,7 @@ class Observation:
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
         self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  0*self.RN_final, self.CIC_charge, self.Additional_background]).T
         self.names = ["Signal","Dark current", "Sky", "Read noise","CIC", "Extra background"]
-        self.snrs=self.Signal_resolution /self.Total_noise_final
+        # self.snrs = self.Signal_resolution /self.Total_noise_final
 
         if np.ndim(self.noises)==2:
             self.percents =  100* np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2
@@ -284,19 +285,16 @@ class Observation:
         self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (self.PSF_RMS_det*2.35)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
-        self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.snrs)
+        self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.SNR)
         # print(self.acquisition_time, self.exposure_time[self.i] , self.readout_time)
         # print(self.N_images_true[self.i], self.N_images[self.i] , self.cosmic_ray_loss[self.i])
-        
         # print("E2E troughput",int((100*self.QE_efficiency * self.Throughput * self.Atmosphere)[self.i]) , "\nFrame number=",self.N_images_true[self.i],"\nResolElem=",self.resolution_element, "\nSignal=",self.Signal_resolution[self.i])
-
         # print("Sigma=5")
         # print("Flux (e/rsol/Nframe), σ==5 :",self.signal_nsig_e_resol_nframe[self.i])
         # print("Flux LU, σ==5 : %0.1E"%(self.signal_nsig_LU[self.i]))
         # print("Flux	erg/cm2/s/''2/Å :",self.signal_nsig_ergs[self.i])
         # print("Flux	overPSF :",self.extended_source_5s[self.i])
         # print("Flux	point source :",self.point_source_5s[self.i])
-
         # print("factor=",self.factor[self.i])
         # print("N_images_true=",np.sqrt(self.N_images_true)[self.i] )
         # print("resolution_element=", self.resolution_element)
@@ -350,7 +348,7 @@ class Observation:
 
         # ax3
         ax3.grid(False)
-        self.stackplot2 = ax3.stackplot(getattr(self,x), self.snrs * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
+        self.stackplot2 = ax3.stackplot(getattr(self,x), self.SNR * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
         ax3.set_ylim((0,np.nanmax(self.SNR)))
         ax3.set_ylabel('SNR (res, N frames)')        
 
