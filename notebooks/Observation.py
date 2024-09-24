@@ -774,12 +774,13 @@ class Observation:
                 sky_lines = Table.read("../data/Instruments/%s/Sky_emission_lines.csv"%(self.instrument.replace(" ","_")))
             else:
                 sky_lines = Table.read("../data/Sky_emission_lines/spectra_0.2A.csv")
-                mask = (sky_lines[sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
+                mask = (sky_lines[10*sky_lines.colnames[0]]>wavelengths.min()-10*self.dispersion) & (10*sky_lines[sky_lines.colnames[0]]<wavelengths.max()+10*self.dispersion)
                 sky_lines = sky_lines[mask]
 
-            sky = interp1d(sky_lines[sky_lines.colnames[0]],sky_lines[sky_lines.colnames[1]])(wavelengths)
+            sky = interp1d(10*sky_lines[sky_lines.colnames[0]],sky_lines[sky_lines.colnames[1]])(wavelengths)
             self.final_sky_before_convolution = (self.sky/self.exposure_time) * sky * (self.Sky/1e-16) #/np.mean(self.sky)   # 
-            self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/(sky_lines[sky_lines.colnames[0]][1]-sky_lines[sky_lines.colnames[0]][0]))
+            sky_model_interval = 10 * (sky_lines[sky_lines.colnames[0]][1]-sky_lines[sky_lines.colnames[0]][0])
+            self.final_sky = gaussian_filter1d(self.final_sky_before_convolution, self.diffuse_spectral_resolution/2.35/sky_model_interval)
 
         else:
             self.final_sky_before_convolution = self.sky/self.exposure_time*np.ones(nsize2)
