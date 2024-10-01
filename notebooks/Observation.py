@@ -29,17 +29,31 @@ from astropy.visualization import quantity_support
 np.seterr(invalid='ignore')
  
 
+def to_float_or_nan(arr):
+    def convert(val):
+        try:
+            return float(val)  # Try to convert to float
+        except (ValueError, TypeError):  # If conversion fails, return NaN
+            return np.nan
+
+    # Apply conversion to entire array using list comprehension
+    return np.array([convert(val) for val in arr])
+
+
 sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-try:
-    instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
-    instruments = Table.from_pandas(instruments_pandas)
-except Exception:
-    instruments = Table.read("../data/Instruments/instruments.csv")
+# try:
+#     instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
+#     instruments = Table.from_pandas(instruments_pandas)
+# except Exception:
+instruments = Table.read("../data/Instruments/instruments.csv")
+for col_name in instruments.colnames[3:]:
+    instruments[col_name] = to_float_or_nan(instruments[col_name])
+
 instruments = instruments[instruments.colnames]
 instruments
-instruments_dict ={ name:{key:float(val) for key, val in zip(instruments["Charact."][:],instruments[name][:])} for name in instruments.colnames[2:]}
+instruments_dict = {name: {key: val for key, val in zip(instruments["Charact."][:], instruments[name][:]) if not isinstance(key, np.ma.core.MaskedConstant) and not isinstance(val, np.ma.core.MaskedConstant)} for name in instruments.colnames[3:]}
 
 
 
@@ -134,7 +148,7 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dard_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dard_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instrument="FIREBall-2 2023", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dard_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None, SNR_res=None):#,photon_kept=0.7#, flight_background_damping = 0.9
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dard_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=1.50,i=33,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=160,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
@@ -178,7 +192,11 @@ class Observation:
         self.flux_fraction_slit_applied = self.flux_fraction
         # if self.smearing>0:
         # self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
-        self.resolution_element= self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
+        
+        if self.SNR_res: 
+            self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
+        else:
+          self.resolution_element = 1
         self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
@@ -251,7 +269,7 @@ class Observation:
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
         self.N_resol_element_A = self.lambda_stack #/ self.dispersion
-        self.factor = np.sqrt(self.N_images_true) * self.resolution_element * np.sqrt(self.N_resol_element_A)
+        self.factor =   self.resolution_element * np.sqrt(self.N_resol_element_A) * np.sqrt(self.N_images_true)
         self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
         self.Total_noise_final = self.factor*np.sqrt(self.signal_noise**2 + self.Dark_current_noise**2  + self.Additional_background_noise**2 + self.Sky_noise**2 + self.CIC_noise**2 + self.RN_final**2   ) #e/  pix/frame
@@ -266,6 +284,7 @@ class Observation:
             for name in ["signal_noise","Dark_current_noise", "Additional_background_noise","Sky_noise", "CIC_noise", "RN_final","Signal_resolution","Signal_el","sky","CIC_charge","Dark_current_f","RN","Additional_background"]:
                 setattr(self, name, getattr(self,name)*np.ones(n))
         self.factor = self.factor*np.ones(n) if type(self.factor)== np.float64 else self.factor
+        self.noises_per_exp = self.resolution_element * np.array([self.signal_noise,  self.Dark_current_noise,  self.Sky_noise, self.RN_final, self.CIC_noise, self.Additional_background_noise, np.sqrt(self.Signal_el)]).T
         self.noises = np.array([self.signal_noise*self.factor,  self.Dark_current_noise*self.factor,  self.Sky_noise*self.factor, self.RN_final*self.factor, self.CIC_noise*self.factor, self.Additional_background_noise*self.factor, self.Signal_resolution]).T
         self.electrons_per_pix =  np.array([self.Signal_el,  self.Dark_current_f,  self.sky,  0*self.RN_final, self.CIC_charge, self.Additional_background]).T
         self.names = ["Signal","Dark current", "Sky", "Read noise","CIC", "Extra background"]
@@ -318,39 +337,42 @@ class Observation:
         """
         fig, axes= plt.subplots(4, 1, figsize=(12, 8), sharex=True) # fig, (ax1, ax2,ax3) = plt.subplots(3, 1, figsize=(12, 7), sharex=True) #figsize=(9, 5.5)
         ax1, ax2,ax3, ax4  = axes
-        labels = ['%s: %0.3f (%0.1f%%)'%(name,self.electrons_per_pix[self.i,j],100*self.electrons_per_pix[self.i,j]/np.nansum(self.electrons_per_pix[self.i,:])) for j,name in enumerate(self.names)]
+        labels = ['%s: %0.3f (%0.1f%%)'%(name, self.resolution_element *self.electrons_per_pix[self.i,j],100*self.electrons_per_pix[self.i,j]/np.nansum(self.electrons_per_pix[self.i,:])) for j,name in enumerate(self.names)]
+
+
 
         # ax1 
         for i,(name,c) in enumerate(zip(self.names,self.colors)):
-            ax1.plot(getattr(self,x), self.noises[:,i]/self.factor,label='%s: %0.2f (%0.1f%%)'%(name,self.noises[self.i,i]/self.factor[self.i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
-        ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1)/self.factor,label='%s: %0.2f (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1])/self.factor[self.i],np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
-        ax1.legend(loc='upper right')
-        ax1.set_ylabel('Noise (e-/pix/exp)')
+            # ax1.plot(getattr(self,x), self.noises[:,i]/self.factor,label='%s: %0.2f (%0.1f%%)'%(name,self.noises[self.i,i]/self.factor[self.i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
+            ax1.plot(getattr(self,x), self.noises_per_exp[:,i],label='%s: %0.2f (%0.1f%%)'%(name,self.noises_per_exp[self.i,i],self.percents[i,self.i]),lw=lw,alpha=0.8,c=c)
+        # ax1.plot(getattr(self,x), np.nansum(self.noises[:,:-1],axis=1)/self.factor,label='%s: %0.2f (%0.1f%%)'%("Total",np.nansum(self.noises[self.i,-1])/self.factor[self.i],np.nansum(self.percents[:,self.i])),lw=lw,alpha=0.4,c="k")
+        # TODO change that with a quadratic sum!!!!!!
+        ax1.plot(getattr(self,x), np.sqrt(np.nansum(np.multiply(self.noises_per_exp[:,:-1],self.noises_per_exp[:,:-1]),axis=1)) ,label='%s: %0.2f'%("Quadratic sum",np.sqrt(np.nansum(np.multiply(self.noises_per_exp[self.i,:-1],self.noises_per_exp[self.i,:-1])))   ) ,lw=lw,alpha=0.4,c="k") #np.nansum(self.percents[:,self.i])
 
-        # ax1b = ax1.secondary_yaxis("right", functions=( lambda x:  x * self.factor[self.i], lambda x:x / self.factor[self.i] ))
-        # self.ax1b = ax1b
-        # ax1b.set_ylabel("Noise (e-/res/N frames)")#r"%0.1f,%0.1f,%0.1f"%(self.factor[self.i],self.resolution_element , np.sqrt(self.N_resol_element_A)))
+        ax1.legend(loc='upper right')
+
 
 
         # ax2 
         ax2.grid(False)
-        self.stackplot1 = ax2.stackplot(getattr(self,x),  np.array(self.electrons_per_pix).T[:,:],alpha=0.7,colors=self.colors,labels=labels)
-        ax2.set_ylabel('e-/pix/frame')
-        ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%(np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
+        # self.stackplot1 = ax2.stackplot(getattr(self,x),  np.array(self.electrons_per_pix).T[:,:],alpha=0.7,colors=self.colors,labels=labels)
+        self.stackplot1 = ax2.stackplot(getattr(self,x),  self.resolution_element**2 * np.array(self.electrons_per_pix).T[:,:],alpha=0.7,colors=self.colors,labels=labels)
+        ax2.legend(loc='upper right',title="Overall background: %0.3f (%0.1f%%)"%( self.resolution_element**2 * np.nansum(self.electrons_per_pix[self.i,1:]),100*np.nansum(self.electrons_per_pix[self.i,1:])/np.nansum(self.electrons_per_pix[self.i,:])))
         ax2.set_xlim((getattr(self,x).min(),getattr(self,x).max()))
-
-
-        # ax2b = ax2.secondary_yaxis("right", functions=( lambda x:  x * self.factor[self.i]**2, lambda x:x / self.factor[self.i]**2 ))
-        # self.ax2b = ax2b
-        # ax2b.set_ylabel(r"%0.1f,%0.1f,%0.1f"%(self.factor[self.i],self.resolution_element , np.sqrt(self.N_resol_element_A)))
-
-
 
         # ax3
         ax3.grid(False)
         self.stackplot2 = ax3.stackplot(getattr(self,x), self.SNR * np.array(self.noises).T[:-1,:]**2/self.Total_noise_final**2,alpha=0.7,colors=self.colors)
         ax3.set_ylim((0,np.nanmax(self.SNR)))
-        ax3.set_ylabel('SNR (res, N frames)')        
+
+        if self.SNR_res:
+            ax1.set_ylabel('Noise (e-/Res/exp)')
+            ax2.set_ylabel('e-/Res/frame')
+            ax3.set_ylabel('SNR (Res, N frames)')        
+        else:
+            ax1.set_ylabel('Noise (e-/pix/exp)')
+            ax2.set_ylabel('e-/pix/frame')
+            ax3.set_ylabel('SNR (pix, N frames)')        
 
         # ax3b = ax3.secondary_yaxis("right", functions=( lambda x: x / self.factor[self.i]**2, lambda x: x * self.factor[self.i]**2))
         # self.ax3b = ax3b
