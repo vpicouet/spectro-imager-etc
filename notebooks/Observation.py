@@ -43,16 +43,14 @@ def to_float_or_nan(arr):
 sheet_id = "1Ox0uxEm2TfgzYA6ivkTpU4xrmN5vO5kmnUPdCSt73uU"
 sheet_name = "instruments.csv"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-# try:
-#     instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
-#     instruments = Table.from_pandas(instruments_pandas)
-# except Exception:
-instruments = Table.read("../data/Instruments/instruments.csv")
-for col_name in instruments.colnames[3:]:
-    instruments[col_name] = to_float_or_nan(instruments[col_name])
-
-instruments = instruments[instruments.colnames]
-instruments
+try:
+    instruments_pandas = pd.read_csv(url,skiprows=[2,5,7,13,26]).drop(["."],axis=1)
+    instruments = Table.from_pandas(instruments_pandas)
+except Exception:
+    instruments = Table.read("../data/Instruments/instruments.csv")
+    for col_name in instruments.colnames[3:]:
+        instruments[col_name] = to_float_or_nan(instruments[col_name])
+    instruments = instruments[instruments.colnames]
 instruments_dict = {name: {key: val for key, val in zip(instruments["Charact."][:], instruments[name][:]) if not isinstance(key, np.ma.core.MaskedConstant) and not isinstance(val, np.ma.core.MaskedConstant)} for name in instruments.colnames[3:]}
 
 
@@ -179,8 +177,8 @@ class Observation:
         if self.precise: # TODO are we sure we should do that here?
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
-            # self.spectro_resolution_A = self.wavelength * self.spectral
-            self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) )
+            self.spectro_resolution_A = 10*self.wavelength/self.Spectral_resolution
+            self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * self.spectro_resolution_A  )) )
             # print("Factor spatial and spectral",  (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) ),   (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) ))
 
         if ~np.isnan(self.Slitwidth).all()  & (~self.IFS):  #& (self.precise)
@@ -193,11 +191,14 @@ class Observation:
         # if self.smearing>0:
         # self.Signal *= 1 - np.exp(-1/(self.smearing+1e-15)) - np.exp(-2/(self.smearing+1e-15))  - np.exp(-3/(self.smearing+1e-15))
         
+        
+        self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
+        # replace by if self.SNR_res=="per Res elem": 
         if self.SNR_res: 
-            self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
+            # self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
+            self.resolution_element = np.sqrt(self.PSF_RMS_det * 2.35 /self.pixel_scale) * np.sqrt(self.PSF_lambda_pix)  # in pix (before it was in arcseconds)
         else:
           self.resolution_element = 1
-        self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
