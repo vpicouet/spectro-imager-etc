@@ -193,12 +193,16 @@ class Observation:
         
         
         self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
-        # replace by if self.SNR_res=="per Res elem": 
-        if self.SNR_res: 
+        # replace by 
+        if self.SNR_res=="per Res elem": 
+        # if self.SNR_res: 
             # self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
             self.resolution_element = np.sqrt(self.PSF_RMS_det * 2.35 /self.pixel_scale) * np.sqrt(self.PSF_lambda_pix)  # in pix (before it was in arcseconds)
-        else:
+        elif self.SNR_res=="per pix":
           self.resolution_element = 1
+        elif self.SNR_res=="per Source":
+            self.resolution_element = np.sqrt(self.PSF_source * 2.35 /self.pixel_scale) * np.sqrt(self.Line_width / self.dispersion)  # in pix (before it was in arcseconds)
+
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
         # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
