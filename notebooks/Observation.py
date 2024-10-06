@@ -195,7 +195,6 @@ class Observation:
         self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
         # replace by 
         if self.SNR_res=="per Res elem": 
-        # if self.SNR_res: 
             # self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
             self.resolution_element = np.sqrt(self.PSF_RMS_det * 2.35 /self.pixel_scale) * np.sqrt(self.PSF_lambda_pix)  # in pix (before it was in arcseconds)
         elif self.SNR_res=="per pix":
@@ -205,11 +204,7 @@ class Observation:
 
 
         red, blue, violet, yellow, green, pink, grey  = '#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777'
-        # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#FFB5B8','#8EBA42','#777777']
-        # self.colors= ['#E24A33','#348ABD','#988ED5','#FBC15E','#8EBA42','#FFB5B8','#777777']
         self.colors= [red, violet, yellow  ,blue, green, pink, grey ]
-        # self.Sky_CU =  convert_ergs2LU(self.Sky_,self.wavelength)
-        # self.Sky_ = self.Sky_CU*self.lu2ergs# ergs/cm2/s/arcsec^2 
 
         self.ENF = 1 if self.counting_mode else 2 # Excess Noise Factor 
         self.CIC_noise = np.sqrt(self.CIC_charge * self.ENF) 
