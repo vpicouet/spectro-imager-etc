@@ -395,7 +395,7 @@ class Observation:
             ax4.plot([getattr(self,x).min(),getattr(self,x).min(),np.nan,getattr(self,x).max(),getattr(self,x).max()],[T2(self.pow_2018),T2(self.pow_best),np.nan,T2(self.pow_2018),T2(self.pow_best)],lw=lw,label="2018 flight (%0.1f) - most optimistic case (%0.1f)"%(self.pow_2018,self.pow_best),c="r",alpha=0.5)
         self.T2=T2
         self.ax4b = ax4b
-        ax4.legend(loc="upper right", fontsize=8,title="Left: Extend. source F, Right: Point source power" )
+        ax4.legend(loc="upper right", fontsize=8,title=r"$\mathbf{Left}$: Ext. Source surface brightness, $\mathbf{Right}$: Point source power",title_fontsize=8 )
         ax4.set_ylabel(r"Log(erg/cm$^2$/s/asec$^2$)")
         ax4b.set_ylabel(r" Log(erg/s)")
 
