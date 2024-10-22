@@ -74,15 +74,15 @@ def rgetattr(obj, attr, *args):
     return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
-def convert_LU2ergs(LU,wave_nm):
-    wave =wave_nm * 1e-7 #/ (1+redshift)
+def convert_LU2ergs(LU,wave_nm,Redshift): #TODO here it should not be 200 nm but 1216 so we need indeed to account for the Redshift!!!
+    wave =wave_nm * 1e-7 / (1+Redshift)
     Energy = 6.62e-27 * 3e10 / wave
     angle =  np.pi / (180 * 3600)
     flux_ergs = LU * Energy * angle * angle
     return flux_ergs
 
-def convert_ergs2LU(flux_ergs,wave_nm):
-    wave =wave_nm * 1e-7 #/ (1+redshift)
+def convert_ergs2LU(flux_ergs,wave_nm,Redshift):
+    wave =wave_nm * 1e-7 / (1+Redshift)
     Energy = 6.62e-27 * 3e10 / wave
     angle =    np.pi / (180 * 3600) 
     LU = flux_ergs/ (Energy  * angle * angle)
@@ -146,7 +146,7 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dark_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instruments=None, instrument="FIREBall-2 2023", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dark_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None, SNR_res=None):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instruments=None, instrument="FIREBall-2 2025", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dark_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None, Redshift=None, SNR_res="per pix"):#,photon_kept=0.7#, flight_background_damping = 0.9
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dark_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=1.50,i=33,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=160,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
@@ -216,10 +216,9 @@ class Observation:
         # Two methods to compute it: interpolate_optimal_threshold & compute_optimal_threshold
         self.pixel_size_arcsec = self.pixel_scale
         # self.pixel_scale  = (self.pixel_scale*np.pi/180/3600) #go from arcsec/pix to str/pix 
+        #TODO maybe issue here, should use 206265?
         self.arcsec2str = (np.pi/180/3600)**2
-        self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength) 
-        # self.Sky_ = convert_LU2ergs(self.Sky_CU, self.wavelength) 
-        # self.Collecting_area *= 100 * 100#m2 to cm2
+        self.Sky_CU = convert_ergs2LU(self.Sky, self.wavelength, self.Redshift) 
         # TODO use astropy.unit
         if (self.counting_mode) : #& (self.EM_gain>=1)  Normaly if counting mode is on EM_gain is >1
             # self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
@@ -260,7 +259,7 @@ class Observation:
         # number of images taken during one field acquisition (~2h)
         self.N_images = self.acquisition_time*3600/(self.exposure_time + self.readout_time)
         self.N_images_true = self.N_images * (1-self.cosmic_ray_loss)
-        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength)
+        self.Signal_LU = convert_ergs2LU(self.Signal,self.wavelength, self.Redshift)
         # if 1==0: # if line is totally resolved (for cosmic web for instance)
         #     self.Signal_el =  self.Signal_LU*self.factor_CU2el*self.exposure_time * self.flux_fraction_slit_applied  / self.spectral_resolution_pixel # el/pix/frame#     Signal * (sky / Sky_)  #el/pix
         # else: # if line is unresolved for QSO for instance
@@ -302,7 +301,7 @@ class Observation:
         # self.signal_nsig_e_resol_nframe = 457*np.ones(self.len_xaxis)
         self.eresolnframe2lu = self.Signal_LU/self.Signal_resolution #TBV
         self.signal_nsig_LU = self.signal_nsig_e_resol_nframe * self.eresolnframe2lu #TBV
-        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength) # self.signal_nsig_LU * self.lu2ergs
+        self.signal_nsig_ergs = convert_LU2ergs(self.signal_nsig_LU, self.wavelength, self.Redshift) # self.signal_nsig_LU * self.lu2ergs
         self.extended_source_5s = self.signal_nsig_ergs * (self.PSF_RMS_det*2.35)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.SNR)
@@ -482,7 +481,7 @@ class Observation:
             else:
                 noise = dark_cic_sky_noise
             # SNR1 = signal1/np.sqrt(signal1+noise+np.array(rn_noise)**2)#
-            SNR1 = signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)**2   )#
+            SNR1 = pc*signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)**2   )#
 
             SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
             SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
@@ -524,6 +523,7 @@ class Observation:
 
                 # ax2.plot(b,SNR1/np.nanmax(SNR1),lw=lw,c="C4") # ,label='SNR1: %0.2f%% ➛ %0.2f%%'%(SNR1[id_55],SNR1[id_t])#'%(100*np.sum(val0[id_t:])/np.sum(val0),100*np.sum(val1[id_t:])/np.sum(val1)),lw=lw)
                 # ax2.plot(b,SNR12,':',label='SNR12, [N1+N2]/[N0] = %0.2f, frac(N1+N2)=%i%%'%((val1[np.nanargmax(SNR12)]+val2[np.nanargmax(SNR12)])/val0[np.nanargmax(SNR12)],100*np.sum(val1[np.nanargmax(SNR12):]+val2[np.nanargmax(SNR12):])/(np.sum(val1)+np.sum(val2))),lw=lw)
+                # TODO check if we should have pc or not!!!
                 ax2.plot(b,SNR1/SNR_analogic,lw=lw,ls=":",c="C3")#,label='SNR1 PC / SNR analogic: %0.2f ➛ %0.2f'%(SNR1[id_55]/SNR_analogic,SNR1[id_t]/SNR_analogic)
 
         if plot_:
@@ -577,7 +577,7 @@ class Observation:
         # print('noises = ',noise)
         print("signal + dark + cic + Sky + rn = 1      :", "%0.2f + %0.2f+ %0.2f+%0.2f+%0.2f=%0.2f"%(flux,dark,CIC,sky,np.sum(val0)/np.sum(val0+val1+val2),  flux+dark+CIC+sky+np.sum(val0)/np.sum(val0+val1+val2)    ))
         # SNR1 = signal1 / np.sqrt(signal1+noise+np.array(rn_noise)**2)#
-        SNR1 = signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)   )  /2#
+        SNR1 = pc*signal1/np.sqrt((flux+dark+CIC+sky)*kept+  ((1-(flux+dark+CIC+sky))*rn_frac)   )  /2#
         SNR12 = pc*signal12/ np.sqrt(signal12+noise+np.array(rn_noise)**2)
         SNR_analogic = flux/np.sqrt(2*flux+2*noise+(RN/(EM_gain * ConversionGain))**2)
         print('SNR_analogic = ',SNR_analogic)
@@ -623,8 +623,8 @@ class Observation:
             ax2.plot([threshold,threshold],[0,1],':',c='k')
             ax1.plot([threshold_55,threshold_55],[0,np.max(val0)],'-.',c='k',label=r"5.5 $\sigma_{RN}$ threshold")
             ax2.plot([threshold_55,threshold_55],[0,1],'-.',c='k')
-            L = ax1.legend(fontsize=10)
-            L = ax1.legend(fontsize=13)
+            L = ax1.legend(fontsize=10,loc="upper right")
+            L = ax1.legend(fontsize=13,loc="upper right")
             # L.get_texts()[1].set_text('0 e- : %i%%, fraction kept: %0.2f%%'%(100*values[0]/(size[0]*size[1]),100*np.sum(val0[id_t:])/np.sum(val0)))
             # L.get_texts()[2].set_text('1 e- : %i%%, fraction kept: %0.2f%%'%(100*values[1]/(size[0]*size[1]),100*np.sum(val1[id_t:])/np.sum(val1)))
             # L.get_texts()[3].set_text('2 e- : %i%%, fraction kept: %0.2f%%'%(100*values[2]/(size[0]*size[1]),100*np.sum(val2[id_t:])/np.sum(val2)))
@@ -642,6 +642,7 @@ class Observation:
             # ax1.set_xlim(xmin=bins.min(),xmax=bins.max()/2)
             if axes is None:
                 fig.tight_layout()
+            fig.savefig("/tmp/histogram_analysis.svg",bbox_inches='tight')
             plt.show()
             # return fig
         # sys.exit()
@@ -705,12 +706,12 @@ class Observation:
 
 
 
-    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=200, Altitude=35,sky_lines=True,redshift=0):
+    def SimulateFIREBallemCCDImage(self,  Bias="Auto",  p_sCIC=0,  SmearExpDecrement=50000,  source="Slit", size=[100, 100], OSregions=[0, 100], name="Auto", spectra="-", cube="-", n_registers=604, save=False, field="targets_F2.csv",QElambda=True,atmlambda=True,fraction_lya=0.05, Full_well=60, conversion_gain=1, Throughput_FWHM=200, Altitude=35,sky_lines=True,Redshift=0):
         # self.EM_gain=1500; Bias=0; self.RN=80; self.CIC_charge=1; p_sCIC=0; self.Dark_current=1/3600; self.smearing=1; SmearExpDecrement=50000; self.exposure_time=50; flux=1; self.Sky=4; source="Spectra m=17"; Rx=8; Ry=8;  size=[100, 100]; OSregions=[0, 120]; name="Auto"; spectra="Spectra m=17"; cube="-"; n_registers=604; save=False;self.readout_time=5;stack=100;self.QE=0.5
         from astropy.modeling.functional_models import Gaussian2D, Gaussian1D
         from scipy.sparse import dia_matrix
         from scipy.interpolate import interp1d
-        self.redshift=redshift
+        self.Redshift=Redshift
         for key in list(self.instruments["Charact."]) + ["Signal_el","N_images_true","Dark_current_f","sky"]:
             if hasattr(self,key ):
                 if (type(getattr(self,key)) != float) & (type(getattr(self,key)) != int) &  (type(getattr(self,key)) != np.float64):
@@ -826,7 +827,7 @@ class Observation:
                 temperature = int(re.search(r'\d+', source).group()) * u.K
 
                 # Définir le spectre de corps noir
-                blackbody_spectra = BlackBody(temperature=temperature/(1+self.redshift))(wavelengths * u.nm)
+                blackbody_spectra = BlackBody(temperature=temperature/(1+self.Redshift))(wavelengths * u.nm)
 
                 # Convertir le spectre de corps noir en unités désirées: erg / (cm^2 * s * Å * arcsec^2)
                 flux_in_erg = blackbody_spectra.to(
@@ -853,14 +854,14 @@ class Observation:
                 elif "COSMOS" in source:
                     a = Table.read("../data/Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
-                    a[wave_name] = a[wave_name]*(1+self.redshift)
+                    a[wave_name] = a[wave_name]*(1+self.Redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
                     a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
                 elif "Salvato" in source:
                     a = Table.read("../data/Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
                     wave_name,flux_name ="col1", "col2"
-                    a[wave_name] = a[wave_name]*(1+self.redshift)
+                    a[wave_name] = a[wave_name]*(1+self.Redshift)
                     mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
                     a = a[mask]
                     a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
