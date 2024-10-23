@@ -153,6 +153,8 @@ class Observation:
         This is currently optimized for slit spectrographs and EMCCD but could be pretty easily generalized to other instrument type if needed
         """
         self.instruments = instruments
+        self.instruments_dict = {name: {key: val for key, val in zip(instruments["Charact."][:], instruments[name][:]) if not isinstance(key, np.ma.core.MaskedConstant) and not isinstance(val, np.ma.core.MaskedConstant)} for name in instruments.colnames[3:]}
+
         for key, val in zip(instruments["Charact."][:],instruments[instrument][:]):
             if hasattr(self,key):
                 if getattr(self,key) is None:
@@ -163,9 +165,10 @@ class Observation:
     def initilize(self,IFS):
         self.precise = True
         # self.Signal = Gaussian2D(amplitude=self.Signal,x_mean=0,y_mean=0,x_stddev=self.PSF_source,y_stddev=self.Line_width,theta=0)(self.Δx,self.Δλ)
-
         # print("\ni",self.i,"\nAtmosphere",self.Atmosphere, "\nThroughput=",self.Throughput,"\nSky=",self.Sky, "\nacquisition_time=",self.acquisition_time,"\ncounting_mode=",self.counting_mode,"\nSignal=",self.Signal,"\nEM_gain=",self.EM_gain,"RN=",self.RN,"CIC_charge=",self.CIC_charge,"Dark_current=",self.Dark_current,"\nreadout_time=",self.readout_time,"\nsmearing=",self.smearing,"\nextra_background=",self.extra_background,"\nPSF_RMS_mask=",self.PSF_RMS_mask,"\nPSF_RMS_det=",self.PSF_RMS_det,"\nQE=",self.QE,"\ncosmic_ray_loss_per_sec=",self.cosmic_ray_loss_per_sec,"\nlambda_stack",self.lambda_stack,"\nSlitwidth",self.Slitwidth, "\nBandwidth",self.Bandwidth,"\nPSF_source",self.PSF_source,"\nCollecting_area",self.Collecting_area)
         # print("\Collecting_area",self.Collecting_area, "\nΔx=",self.Δx,"\nΔλ=",self.Δλ, "\napixel_scale=",self.pixel_scale,"\nSpectral_resolution=",self.Spectral_resolution,"\ndispersion=",self.dispersion,"\nLine_width=",self.Line_width,"wavelength=",self.wavelength,"pixel_size=",self.pixel_size)
+        self.spectro = False if np.isnan(self.instruments_dict[self.instrument]["dispersion"]) else True
+    
         # Simple hack to me able to use UV magnitudes (not used for the ETC)
         if np.max([self.Signal])>1:
             self.Signal = 10**(-(self.Signal-20.08)/2.5)*2.06*1E-16
@@ -179,7 +182,8 @@ class Observation:
             self.Signal *= (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) )
             #convolve input flux by spectral resolution
             self.spectro_resolution_A = 10*self.wavelength/self.Spectral_resolution
-            self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * self.spectro_resolution_A  )) )
+            if self.spectro:
+                self.Signal *= (erf(self.Line_width / (2 * np.sqrt(2) * self.spectro_resolution_A  )) )
             # print("Factor spatial and spectral",  (erf(self.PSF_source / (2 * np.sqrt(2) * self.PSF_RMS_det)) ),   (erf(self.Line_width / (2 * np.sqrt(2) * 10*self.wavelength/self.Spectral_resolution)) ))
 
         if ~np.isnan(self.Slitwidth).all()  & (~self.IFS):  #& (self.precise)
@@ -194,9 +198,8 @@ class Observation:
         
         
         self.PSF_lambda_pix = 10*self.wavelength / self.Spectral_resolution / self.dispersion
-        # replace by 
+
         if self.SNR_res=="per Res elem": 
-            # self.resolution_element = self.PSF_RMS_det * 2.35 /self.pixel_scale  # in pix (before it was in arcseconds)
             self.resolution_element = np.sqrt(self.PSF_RMS_det * 2.35 /self.pixel_scale) * np.sqrt(self.PSF_lambda_pix)  # in pix (before it was in arcseconds)
         elif self.SNR_res=="per pix":
           self.resolution_element = 1
@@ -222,7 +225,11 @@ class Observation:
         # TODO use astropy.unit
         if (self.counting_mode) : #& (self.EM_gain>=1)  Normaly if counting mode is on EM_gain is >1
             # self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion
-            self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str  * self.dispersion
+            if self.spectro:
+                self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str  * self.dispersion
+            else:
+                self.factor_CU2el =  self.QE * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100) # * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str  * self.dispersion
+
             self.sky = self.Sky_CU*self.factor_CU2el*self.exposure_time  # el/pix/frame
             self.Sky_noise_pre_thresholding = np.sqrt(self.sky * self.ENF) 
             self.signal_pre_thresholding = self.Signal*self.factor_CU2el*self.exposure_time  # el/pix/frame
@@ -230,9 +237,7 @@ class Observation:
             # self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = self.compute_optimal_threshold(plot_=plot_, i=i,flux=self.signal_pre_thresholding)
         else:
             self.n_threshold, self.Photon_fraction_kept, self.RN_fraction_kept, self.gain_thresholding = np.zeros(self.len_xaxis),np.ones(self.len_xaxis),np.ones(self.len_xaxis), np.zeros(self.len_xaxis)
-        
-        
-        
+                
         # The faction of detector lost by cosmic ray masking (taking into account ~5-10 impact per seconds and around 2000 pixels loss per impact (0.01%))
         self.cosmic_ray_loss = np.minimum(self.cosmic_ray_loss_per_sec*(self.exposure_time+self.readout_time/2),1)
         self.QE_efficiency = self.Photon_fraction_kept * self.QE
@@ -243,10 +248,14 @@ class Observation:
             # self.nfibers = np.sqrt((self.PSF_RMS_det * 2.35)**2+self.Slitwidth**2)/(self.PSF_RMS_det * 2.35)
         else: # Because for IFS we keep all the flux (what does not enter a fiber will enter the next one). should normally account for a fill factor but this could appear in throughput
             self.nfibers = 1
-        # TODO need to verify that the evolution the sky and signal makes sense with nfibers...
-        self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
-        self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
-
+        # TODO need to verify that the evolution the sky and signal makes sense with nfibers... Maybe this has been solved
+        
+        if self.spectro:
+            self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+            self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
+        else: # under development # TODO change this for imager
+            self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)     *self.pixel_scale**2 *self.Bandwidth   * self.arcsec2str  # * self.dispersion * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str
+            self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  *self.pixel_scale**2 *self.Bandwidth  * self.arcsec2str  # * self.dispersion  * self.Slitwidth 
 
         self.sky = self.Sky_CU*self.factor_CU2el_sky*self.exposure_time  # el/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
@@ -268,7 +277,9 @@ class Observation:
 
         self.signal_noise = np.sqrt(self.Signal_el * self.ENF)     #el / resol/ N frame
 
-        self.N_resol_element_A = self.lambda_stack #/ self.dispersion
+        if self.spectro:
+            self.lambda_stack = 1 
+        self.N_resol_element_A = self.lambda_stack 
         self.factor =   self.resolution_element * np.sqrt(self.N_resol_element_A) * np.sqrt(self.N_images_true)
         self.Signal_resolution = self.Signal_el * self.factor**2# el/N exposure/resol
         self.signal_noise_nframe = self.signal_noise * self.factor
@@ -305,6 +316,8 @@ class Observation:
         self.extended_source_5s = self.signal_nsig_ergs * (self.PSF_RMS_det*2.35)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.SNR)
+        self.atm_trans=np.nan
+        self.final_sky=np.nan
         # print(self.acquisition_time, self.exposure_time[self.i] , self.readout_time)
         # print(self.N_images_true[self.i], self.N_images[self.i] , self.cosmic_ray_loss[self.i])
         # print("E2E troughput",int((100*self.QE_efficiency * self.Throughput * self.Atmosphere)[self.i]) , "\nFrame number=",self.N_images_true[self.i],"\nResolElem=",self.resolution_element, "\nSignal=",self.Signal_resolution[self.i])
@@ -818,73 +831,77 @@ class Observation:
         if ("Spectra" in source) | ("Salvato" in source) | ("COSMOS" in source)| ("Blackbody" in source):
             # TODO should I replace PSF_x by PSF_x**2+Rx**2???? Issue with the normilization maybe... Need to compare to Bruno's code
             spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-            if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
-                spectra = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
-                spectra *= atm_qe_normalized_shape   #* self.QE*self.Atmosphere
+            if self.spectro:
+                if ("baseline" in source.lower()) | (("UVSpectra=" in source) & (self.wavelength>300  )):
+                    spectra = flux* Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, PSF_λ)/ Gaussian1D.evaluate(np.arange(size[0]),  1,  size[0]/2, self.PSF_lambda_pix**2/(PSF_λ**2 + self.PSF_lambda_pix**2)).sum()
+                    spectra *= atm_qe_normalized_shape   #* self.QE*self.Atmosphere
 
-                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
-            elif "blackbody" in source.lower():
-                temperature = int(re.search(r'\d+', source).group()) * u.K
+                    source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(size[1]),  1,  50, Rx**2/(PSF_x**2+Rx**2)).sum()
+                elif "blackbody" in source.lower():
+                    temperature = int(re.search(r'\d+', source).group()) * u.K
+                    blackbody_spectra = BlackBody(temperature=temperature/(1+self.Redshift))(wavelengths * u.nm)
 
-                # Définir le spectre de corps noir
-                blackbody_spectra = BlackBody(temperature=temperature/(1+self.Redshift))(wavelengths * u.nm)
-
-                # Convertir le spectre de corps noir en unités désirées: erg / (cm^2 * s * Å * arcsec^2)
-                flux_in_erg = blackbody_spectra.to(
-                    u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
-                    equivalencies=u.spectral_density(wavelengths * u.nm))
-                # Ajuster le spectre du corps noir pour correspondre au flux moyen donné sur le détecteur
-                spectra = atm_qe_normalized_shape  * (flux_in_erg.value/np.mean(flux_in_erg.value)) * flux    #* self.QE*self.Atmosphere
-                # print(flux,np.mean(spectra),self.Signal, np.mean(flux_in_erg.value), np.mean(flux_in_erg.value) )
-                # spatial_profile = Gaussian1D.evaluate(np.arange(size[1]),  1,  size[1]/2, PSF_x)
-                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
-            else:
-                if "_" not in source:
-                    flux_name,wave_name ="FLUX", "WAVELENGTH"
-                    fname = "h_%sfos_spc.fits"%(source.split(" ")[2])
-                    # print(fname)
-                    try:
-                        a = Table.read("../data/Spectra/"+fname)
-                    except FileNotFoundError: 
-                        a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
-                    a["photons"] = a[flux_name]/9.93E-12   
-                    # TODO why there is no QE in the formula??
-                    # a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
-                    a["e_pix_sec"]  = flux * a["photons"] / np.nanmax(a["photons"])
-                elif "COSMOS" in source:
-                    a = Table.read("../data/Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
-                    wave_name,flux_name ="col1", "col2"
-                    a[wave_name] = a[wave_name]*(1+self.Redshift)
-                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
-                    a = a[mask]
-                    a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
-                elif "Salvato" in source:
-                    a = Table.read("../data/Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
-                    wave_name,flux_name ="col1", "col2"
-                    a[wave_name] = a[wave_name]*(1+self.Redshift)
-                    mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
-                    a = a[mask]
-                    a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
-                min_interval = np.nanmin(wavelengths[1:] - wavelengths[:-1])
-                mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
-                slits = None 
-                source_background=np.zeros((nsize,nsize2))
-                f = interp1d(a[wave_name],a["e_pix_sec"])
-                
-                spectra = gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe_normalized_shape      #* self.QE*self.Atmosphere
-                spatial_profile =  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) #/Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
-                subim = np.zeros((nsize2,nsize))
-                source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
- 
-
-            if np.isfinite(length) & (np.ptp(a_ + b_)>0):
-                if self.Slitlength/self.pixel_scale<nsize:
-                    self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, slit_profile ).T
+                    # Convertir le spectre de corps noir en unités désirées: erg / (cm^2 * s * Å * arcsec^2)
+                    flux_in_erg = blackbody_spectra.to(
+                        u.erg / (u.cm**2 * u.s * u.AA * u.arcsec**2),
+                        equivalencies=u.spectral_density(wavelengths * u.nm))
+                    # Ajuster le spectre du corps noir pour correspondre au flux moyen donné sur le détecteur
+                    spectra = atm_qe_normalized_shape  * (flux_in_erg.value/np.mean(flux_in_erg.value)) * flux    #* self.QE*self.Atmosphere
+                    source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
                 else:
-                    self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE,  np.ones(nsize) / nsize ).T
+                    if "_" not in source:
+                        flux_name,wave_name ="FLUX", "WAVELENGTH"
+                        fname = "h_%sfos_spc.fits"%(source.split(" ")[2])
+                        # print(fname)
+                        try:
+                            a = Table.read("../data/Spectra/"+fname)
+                        except FileNotFoundError: 
+                            a = Table.read("/Users/Vincent/Github/notebooks/Spectra/" + fname)
+                        a["photons"] = a[flux_name]/9.93E-12   
+                        # TODO why there is no QE in the formula??
+                        # a["e_pix_sec"]  = a["photons"] * self.Throughput * self.Atmosphere  * self.Collecting_area*100*100 *self.dispersion
+                        a["e_pix_sec"]  = flux * a["photons"] / np.nanmax(a["photons"])
+                    elif "COSMOS" in source:
+                        a = Table.read("../data/Spectra/GAL_COSMOS_SED/%s.txt"%(source.split(" ")[2]),format="ascii")
+                        wave_name,flux_name ="col1", "col2"
+                        a[wave_name] = a[wave_name]*(1+self.Redshift)
+                        mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
+                        a = a[mask]
+                        a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
+                    elif "Salvato" in source:
+                        a = Table.read("../data/Spectra/QSO_SALVATO2015/%s.txt"%(source.split(" ")[2]),format="ascii")
+                        wave_name,flux_name ="col1", "col2"
+                        a[wave_name] = a[wave_name]*(1+self.Redshift)
+                        mask = (a[wave_name]>wave_min - 100) & (a[wave_name]<wave_max+100)
+                        a = a[mask]
+                        a["e_pix_sec"] = flux * a[flux_name] / np.nanmax(a[flux_name])
+                    min_interval = np.nanmin(wavelengths[1:] - wavelengths[:-1])
+                    mask = (a[wave_name]>wave_min) & (a[wave_name]<wave_max)
+                    slits = None 
+                    source_background=np.zeros((nsize,nsize2))
+                    f = interp1d(a[wave_name],a["e_pix_sec"])
+                    
+                    spectra = gaussian_filter1d(f(wavelengths),  self.diffuse_spectral_resolution/min_interval/2.35) * atm_qe_normalized_shape      #* self.QE*self.Atmosphere
+                    spatial_profile =  Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x) #/Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, PSF_x).sum()
+                    subim = np.zeros((nsize2,nsize))
+                    source_im =  np.outer(spectra,spatial_profile ).T /Gaussian1D.evaluate(np.arange(nsize),  1,  nsize/2, Rx**2/(PSF_x**2+Rx**2)).sum()
+    
+
+                if np.isfinite(length) & (np.ptp(a_ + b_)>0):
+                    if self.Slitlength/self.pixel_scale<nsize:
+                        self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, slit_profile ).T
+                    else:
+                        self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE,  np.ones(nsize) / nsize ).T
+                else:
+                    self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, np.ones(size[1])   ).T                
             else:
-                self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, np.ones(size[1])   ).T                
-            # plt.figure();plt.imshow(self.sky_im);plt.colorbar(orientation="horizontal");plt.title("sum=%0.1E"%(self.sky_im.sum()));plt.show()
+                self.sky_im = self.sky/self.exposure_time
+                gaussian = Gaussian2D(amplitude=flux, x_mean=nsize2/2, y_mean=nsize/2, x_stddev=PSF_x, y_stddev=PSF_x, theta=0)
+                X, Y = np.meshgrid(np.arange(nsize2), np.arange(nsize))
+                source_im = gaussian(X, Y)
+
+
+                # plt.figure();plt.imshow(self.sky_im);plt.colorbar(orientation="horizontal");plt.title("sum=%0.1E"%(self.sky_im.sum()));plt.show()
 
 
 
