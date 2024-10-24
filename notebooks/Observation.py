@@ -146,7 +146,7 @@ def variable_smearing_kernels(image, smearing=1.5, SmearExpDecrement=50000):
 class Observation:
     @initializer
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13*0.9, exposure_time=50, counting_mode=False, Signal=1e-16, EM_gain=1400, RN=109, CIC_charge=0.005, Dark_current=0.08, Sky=10000, readout_time=1.5, extra_background = 0,acquisition_time = 2,smearing=0,i=25,plot_=False,temperature=-100,n=n,PSF_RMS_mask=5, PSF_RMS_det=8, QE = 0.45,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=1,Slitwidth=5,Bandwidth=200,Collecting_area=1,Δx=0,Δλ=0,pixel_scale=np.nan, Spectral_resolution=np.nan, dispersion=np.nan,Line_width=np.nan,wavelength=np.nan, pixel_size=np.nan,len_xaxis=50):#,photon_kept=0.7#, flight_background_damping = 0.9
-    def __init__(self, instruments=None, instrument="FIREBall-2 2025", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dark_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None, Redshift=None, SNR_res="per pix"):#,photon_kept=0.7#, flight_background_damping = 0.9
+    def __init__(self, instruments=None, instrument="FIREBall-2 2025", Atmosphere=None, Throughput=None, exposure_time=None, counting_mode=False, Signal=None, EM_gain=None, RN=None, CIC_charge=None, Dark_current=None, Sky=None, readout_time=None, extra_background = None,acquisition_time = None,smearing=None,i=33,plot_=False,n=n,PSF_RMS_mask=None, PSF_RMS_det=None, QE = None,cosmic_ray_loss_per_sec=None,PSF_source=None,lambda_stack=1,Slitwidth=None,Bandwidth=None,Collecting_area=None,Δx=None,Δλ=None,pixel_scale=None, Spectral_resolution=None, dispersion=None,Line_width=None,wavelength=None, pixel_size=None,len_xaxis=50,Slitlength=None,IFS=None, Redshift=None, Throughput_FWHM=None, SNR_res="per pix"):#,photon_kept=0.7#, flight_background_damping = 0.9
     # def __init__(self, instrument="FIREBall-2 2023", Atmosphere=0.5, Throughput=0.13, exposure_time=50, counting_mode=False, Signal=1e-17, EM_gain=1500, RN=40, CIC_charge=0.005, Dark_current=1, Sky=2e-18, readout_time=5, extra_background = 0.5,acquisition_time = 2,smearing=1.50,i=33,plot_=False,n=n,PSF_RMS_mask=2.5, PSF_RMS_det=3, QE = 0.4,cosmic_ray_loss_per_sec=0.005,PSF_source=16,lambda_stack=0.21,Slitwidth=6,Bandwidth=160,Collecting_area=0.707,Δx=0,Δλ=0,pixel_scale=1.1, Spectral_resolution=1300, dispersion=0.21,Line_width=15,wavelength=200, pixel_size=13,len_xaxis=50,Slitlength=10):#,photon_kept=0.7#, flight_background_damping = 0.9
         """
         ETC calculator: computes the noise budget at the detector level based on instrument/detector parameters
@@ -254,8 +254,8 @@ class Observation:
             self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * np.minimum(self.Slitwidth,self.PSF_source) * self.arcsec2str  * self.dispersion *self.pixel_scale**2
             self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  * self.Slitwidth * self.arcsec2str  * self.dispersion *self.pixel_scale**2
         else: # under development # TODO change this for imager
-            self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)     *self.pixel_scale**2 *self.Bandwidth   * self.arcsec2str  # * self.dispersion * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str
-            self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  *self.pixel_scale**2 *self.Bandwidth  * self.arcsec2str  # * self.dispersion  * self.Slitwidth 
+            self.factor_CU2el = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)     *self.pixel_scale**2 *self.Throughput_FWHM   * self.arcsec2str  # * self.dispersion * np.minimum(self.Slitwidth,self.PSF_source)  * self.arcsec2str
+            self.factor_CU2el_sky = self.nfibers * self.QE_efficiency * self.Throughput * self.Atmosphere  *    (self.Collecting_area * 100 * 100)  *self.pixel_scale**2 *self.Throughput_FWHM  * self.arcsec2str  # * self.dispersion  * self.Slitwidth 
 
         self.sky = self.Sky_CU*self.factor_CU2el_sky*self.exposure_time  # el/pix/frame
         self.Sky_noise = np.sqrt(self.sky * self.ENF) 
@@ -316,8 +316,11 @@ class Observation:
         self.extended_source_5s = self.signal_nsig_ergs * (self.PSF_RMS_det*2.35)**2
         self.point_source_5s = self.extended_source_5s * 1.30e57
         self.time2reach_n_sigma_SNR = self.acquisition_time *  np.square(n_sigma / self.SNR)
-        self.atm_trans=np.nan
-        self.final_sky=np.nan
+        # self.atm_trans=np.nan
+        # self.final_sky=np.nan
+        # self.Throughput_curve=np.nan
+
+
         # print(self.acquisition_time, self.exposure_time[self.i] , self.readout_time)
         # print(self.N_images_true[self.i], self.N_images[self.i] , self.cosmic_ray_loss[self.i])
         # print("E2E troughput",int((100*self.QE_efficiency * self.Throughput * self.Atmosphere)[self.i]) , "\nFrame number=",self.N_images_true[self.i],"\nResolElem=",self.resolution_element, "\nSignal=",self.Signal_resolution[self.i])
@@ -751,7 +754,7 @@ class Observation:
 
         # self.Dark_current & flux
         source_im = 0 * image[:, OSregions[0] : OSregions[1]]
-        self.sky_im = 0 * image[:, OSregions[0] : OSregions[1]]
+        self.sky_im = np.ones(image[:, OSregions[0] : OSregions[1]].shape) 
         source_im_wo_atm = 0 * image[:, OSregions[0] : OSregions[1]]
         lx, ly = source_im.shape
         y = np.linspace(0, lx - 1, lx)
@@ -767,16 +770,17 @@ class Observation:
         wave_min, wave_max = 10*self.wavelength - (size[0]/2) * self.dispersion , 10*self.wavelength + (size[0]/2) * self.dispersion
         nsize2, nsize = size
         wavelengths = np.linspace(wave_min,wave_max,nsize2)
-
-        if os.path.exists("../data/Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_"))):
-            QE = Table.read("../data/Instruments/%s/Throughput.csv"%(self.instrument.replace(" ","_")))
+        if os.path.exists("../data/Instruments/%s/Throughput.csv"%(self.instrument.upper().replace(" ","_"))):
+            QE = Table.read("../data/Instruments/%s/Throughput.csv"%(self.instrument.upper().replace(" ","_")))
             QE = interp1d(QE[QE.colnames[0]]*10,QE[QE.colnames[1]])#
+
             self.Throughput_curve = QE(wavelengths)/np.nanmax(QE(wavelengths))  if QElambda else Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )
+        
         else:
             self.Throughput_curve = Gaussian1D.evaluate(wavelengths,  1,  self.wavelength*10, Throughput_FWHM )  if QElambda else 1  #self.QE
-
-        if os.path.exists("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_"))):
-            trans = Table.read("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.replace(" ","_")))
+        # print(self.Throughput_curve)
+        if os.path.exists("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.upper().replace(" ","_"))):
+            trans = Table.read("../data/Instruments/%s/Atmosphere_transmission.csv"%(self.instrument.upper().replace(" ","_")))
             resolution_atm = self.diffuse_spectral_resolution/(10*(wavelengths[2]-wavelengths[1]))
             trans["trans_conv"] = gaussian_filter1d(trans[trans.colnames[0]], resolution_atm/2.35)
             self.atm_trans_before_convolution =  interp1d(list(trans[trans.colnames[0]]*10),list(trans[trans.colnames[1]]))(wavelengths)
@@ -895,7 +899,7 @@ class Observation:
                 else:
                     self.sky_im =   np.outer(self.final_sky * self.Throughput_curve /self.QE, np.ones(size[1])   ).T                
             else:
-                self.sky_im = self.sky/self.exposure_time
+                self.sky_im *= self.sky/self.exposure_time
                 gaussian = Gaussian2D(amplitude=flux, x_mean=nsize2/2, y_mean=nsize/2, x_stddev=PSF_x, y_stddev=PSF_x, theta=0)
                 X, Y = np.meshgrid(np.arange(nsize2), np.arange(nsize))
                 source_im = gaussian(X, Y)
